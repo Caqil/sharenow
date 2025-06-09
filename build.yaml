@@ -1,0 +1,25 @@
+targets:
+  $default:
+    builders:
+      freezed:
+        enabled: true
+        generate_for:
+          - lib/core/models/*.dart
+      json_serializable:
+        enabled: true
+        generate_for:
+          - lib/core/models/*.dart
+      hive_generator:
+        enabled: true
+        generate_for:
+          - lib/core/models/*.dart
+
+global_options:
+  freezed:
+    options:
+      # Generate copyWith method
+      copy_with: true
+      # Generate equality operators
+      equal: true
+      # Generate toString method
+      to_string: true
