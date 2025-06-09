@@ -54,7 +54,6 @@ class AppRouter {
   AppRouter() {
     _router = GoRouter(
       initialLocation: initialRoute,
-      debugLogDiagnostics: AppConstants.isDebugMode,
       errorBuilder: (context, state) => ErrorPage(
         error: state.error?.toString() ?? 'Unknown error occurred',
         onRetry: () => context.go(home),

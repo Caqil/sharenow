@@ -1,30 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_shareit/app/theme.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
 
 // Core imports
 import '../core/constants/app_constants.dart';
-import '../core/services/storage_service.dart';
-import '../core/services/transfer_service.dart';
-import '../core/services/connection_service.dart';
-import '../core/services/permission_service.dart';
-import '../core/services/notification_service.dart';
-
-// Theme imports
-import '../core/theme/app_theme.dart';
-
-// Router imports
-import '../core/router/app_router.dart';
+import '../core/di/direct_setup.dart';
 
 // Bloc imports
 import '../features/settings/bloc/settings_bloc.dart';
+import '../features/settings/bloc/settings_state.dart';
 import '../features/transfer/bloc/transfer_bloc.dart';
 import '../features/connection/bloc/connection_bloc.dart';
 import '../features/home/bloc/home_bloc.dart';
-
-// Dependency injection
-import '../injection_container.dart';
 
 /// Root application widget that configures the entire app
 class ShareItApp extends StatelessWidget {
@@ -32,45 +21,40 @@ class ShareItApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Configure system UI overlay style
-    SystemChrome.setSystemUIOverlayStyle(
-      const SystemUiOverlayStyle(
-        statusBarColor: Colors.transparent,
-        systemNavigationBarColor: Colors.transparent,
-        statusBarIconBrightness: Brightness.dark,
-        systemNavigationBarIconBrightness: Brightness.dark,
-      ),
-    );
-
-    // Set preferred orientations
-    SystemChrome.setPreferredOrientations([
-      DeviceOrientation.portraitUp,
-      DeviceOrientation.portraitDown,
-    ]);
-
     return MultiBlocProvider(
       providers: [
         // Settings Bloc - handles app-wide settings including theme
         BlocProvider<SettingsBloc>(
-          create: (context) =>
-              getIt<SettingsBloc>()..add(const SettingsEvent.initialize()),
+          create: (context) => SettingsBloc(AppServices.storageService)
+            ..add(const SettingsEvent.initialize()),
         ),
 
         // Transfer Bloc - handles file transfer operations
         BlocProvider<TransferBloc>(
-          create: (context) => getIt<TransferBloc>(),
+          create: (context) => TransferBloc(
+            AppServices.transferService,
+            AppServices.connectionService,
+            AppServices.storageService,
+          ),
         ),
 
         // Connection Bloc - handles device discovery and connections
         BlocProvider<ConnectionBloc>(
-          create: (context) =>
-              getIt<ConnectionBloc>()..add(const ConnectionEvent.initialize()),
+          create: (context) => ConnectionBloc(
+            AppServices.connectionService,
+            AppServices.storageService,
+          )..add(const ConnectionEvent.initialize()),
         ),
 
         // Home Bloc - handles home screen state
         BlocProvider<HomeBloc>(
-          create: (context) =>
-              getIt<HomeBloc>()..add(const HomeEvent.loadData()),
+          create: (context) => HomeBloc(
+            AppServices.connectionService,
+            AppServices.transferService,
+            AppServices.fileService,
+            AppServices.storageService,
+            AppServices.permissionService,
+          )..add(const HomeEvent.loadData()),
         ),
       ],
       child: BlocBuilder<SettingsBloc, SettingsState>(
@@ -80,50 +64,41 @@ class ShareItApp extends StatelessWidget {
               previous.primaryColor != current.primaryColor;
         },
         builder: (context, settingsState) {
-          return ShadApp.materialRouter(
+          return ShadApp.router(
             // App Identity
             title: AppConstants.appName,
             debugShowCheckedModeBanner: false,
 
             // Routing Configuration
-            routerConfig: getIt<AppRouter>().router,
+            routerConfig: AppServices.router.router,
 
-            // Shadcn UI Theme Configuration
-            theme: AppTheme.lightTheme(
-              primaryColor: settingsState.primaryColor,
-            ),
             darkTheme: AppTheme.darkTheme(
-              primaryColor: settingsState.primaryColor,
+              primaryColor: settingsState.primaryColor ?? AppTheme.blue,
             ),
+            themeMode: settingsState.themeMode,
+            supportedLocales: const [
+              Locale('en', 'US'),
+              Locale('es', 'ES'),
+              Locale('fr', 'FR'),
+              Locale('de', 'DE'),
+              Locale('zh', 'CN'),
+              Locale('ja', 'JP'),
+            ],
 
-            // Material Theme Configuration (for fallback compatibility)
-            materialTheme: AppTheme.materialLightTheme(
-              primaryColor: settingsState.primaryColor,
-            ),
-            materialDarkTheme: AppTheme.materialDarkTheme(
-              primaryColor: settingsState.primaryColor,
-            ),
-
-            // Theme mode
-            themeMode: _mapThemeMode(settingsState.themeMode),
-
-            // Localization (if needed in future)
-            // locale: settingsState.locale,
-            // supportedLocales: AppConstants.supportedLocales,
-            // localizationsDelegates: AppLocalizations.localizationsDelegates,
-
-            // App Builder - wraps entire app with global configurations
+            // Builder for system UI configuration and responsive design
             builder: (context, child) {
-              return AnnotatedRegion<SystemUiOverlayStyle>(
-                value: _getSystemUiOverlayStyle(context),
-                child: MediaQuery(
-                  // Ensure text doesn't scale beyond reasonable limits
-                  data: MediaQuery.of(context).copyWith(
-                    textScaler: MediaQuery.of(context).textScaler.clamp(
-                          minScaleFactor: 0.8,
-                          maxScaleFactor: 1.3,
-                        ),
+              return MediaQuery(
+                // Ensure text scaling doesn't break UI
+                data: MediaQuery.of(context).copyWith(
+                  textScaler: TextScaler.linear(
+                    MediaQuery.of(context)
+                        .textScaler
+                        .scale(1.0)
+                        .clamp(0.8, 1.3),
                   ),
+                ),
+                child: AnnotatedRegion<SystemUiOverlayStyle>(
+                  value: _getSystemUiOverlayStyle(context),
                   child: child ?? const SizedBox.shrink(),
                 ),
               );
@@ -134,96 +109,59 @@ class ShareItApp extends StatelessWidget {
     );
   }
 
-  /// Map internal theme mode to Flutter's ThemeMode
-  ThemeMode _mapThemeMode(String themeMode) {
-    switch (themeMode) {
-      case 'light':
-        return ThemeMode.light;
-      case 'dark':
-        return ThemeMode.dark;
-      case 'system':
-      default:
-        return ThemeMode.system;
-    }
-  }
-
   /// Get system UI overlay style based on current theme
   SystemUiOverlayStyle _getSystemUiOverlayStyle(BuildContext context) {
-    final shadTheme = ShadTheme.of(context);
-    final isLight = shadTheme.brightness == Brightness.light;
+    final isDark = context.isDarkMode;
 
     return SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
+      statusBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
+      statusBarBrightness: isDark ? Brightness.dark : Brightness.light,
       systemNavigationBarColor: Colors.transparent,
-      statusBarBrightness: isLight ? Brightness.light : Brightness.dark,
-      statusBarIconBrightness: isLight ? Brightness.dark : Brightness.light,
       systemNavigationBarIconBrightness:
-          isLight ? Brightness.dark : Brightness.light,
+          isDark ? Brightness.light : Brightness.dark,
     );
   }
 }
 
-/// Global app configuration and initialization
+/// Global app configuration and initialization helpers
 class AppConfig {
-  static Future<void> initialize() async {
-    WidgetsFlutterBinding.ensureInitialized();
+  AppConfig._(); // Private constructor to prevent instantiation
 
-    // Initialize dependency injection
-    await configureDependencies();
+  /// Check if the app is fully initialized
+  static bool get isInitialized => AppServices.isInitialized;
 
-    // Initialize core services
-    await _initializeServices();
+  /// Get app version info
+  static String get appVersion => AppConstants.appVersion;
 
-    // Configure system settings
-    await _configureSystemSettings();
-  }
+  /// Get app name
+  static String get appName => AppConstants.appName;
 
-  /// Initialize all core services
-  static Future<void> _initializeServices() async {
+  /// Configure system-level settings (called from main.dart)
+  static Future<void> configureSystemSettings() async {
     try {
-      // Initialize storage service first (others may depend on it)
-      final storageService = getIt<StorageService>();
-      await storageService.initialize();
+      // Configure system chrome
+      SystemChrome.setSystemUIOverlayStyle(
+        const SystemUiOverlayStyle(
+          statusBarColor: Colors.transparent,
+          systemNavigationBarColor: Colors.transparent,
+        ),
+      );
 
-      // Initialize permission service
-      final permissionService = getIt<PermissionService>();
-      await permissionService.initialize();
+      // Set preferred orientations
+      await SystemChrome.setPreferredOrientations([
+        DeviceOrientation.portraitUp,
+        DeviceOrientation.portraitDown,
+      ]);
 
-      // Initialize notification service
-      final notificationService = getIt<NotificationService>();
-      await notificationService.initialize();
-
-      // Initialize connection service
-      final connectionService = getIt<ConnectionService>();
-      await connectionService.initialize();
-
-      // Transfer service is lazy-initialized when first used
+      // Enable edge-to-edge
+      await SystemChrome.setEnabledSystemUIMode(
+        SystemUiMode.edgeToEdge,
+      );
     } catch (e) {
       // Log error but don't prevent app from starting
-      debugPrint('Failed to initialize some services: $e');
+      debugPrint('Failed to configure system settings: $e');
     }
-  }
-
-  /// Configure system-level settings
-  static Future<void> _configureSystemSettings() async {
-    // Configure system chrome
-    await SystemChrome.setSystemUIOverlayStyle(
-      const SystemUiOverlayStyle(
-        statusBarColor: Colors.transparent,
-        systemNavigationBarColor: Colors.transparent,
-      ),
-    );
-
-    // Set preferred orientations
-    await SystemChrome.setPreferredOrientations([
-      DeviceOrientation.portraitUp,
-      DeviceOrientation.portraitDown,
-    ]);
-
-    // Enable edge-to-edge
-    await SystemChrome.setEnabledSystemUIMode(
-      SystemUiMode.edgeToEdge,
-    );
   }
 }
 
@@ -243,47 +181,40 @@ class AppErrorBoundary extends StatefulWidget {
 class _AppErrorBoundaryState extends State<AppErrorBoundary> {
   bool hasError = false;
   Object? error;
+  StackTrace? stackTrace;
 
   @override
   Widget build(BuildContext context) {
     if (hasError) {
-      return ShadApp(
-        theme: AppTheme.lightTheme(),
+      return MaterialApp(
         home: Scaffold(
+          appBar: AppBar(title: const Text('Application Error')),
           body: Center(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(
-                  Icons.error_outline,
-                  size: 64,
-                  color: Color(0xFFDC2626), // red
-                ),
+                const Icon(Icons.error_outline, size: 64, color: Colors.red),
                 const SizedBox(height: 16),
                 const Text(
                   'Something went wrong',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w600,
-                  ),
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 8),
-                const Text(
-                  'Please restart the app',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Color(0xFF64748B),
-                  ),
+                Text(
+                  error?.toString() ?? 'Unknown error',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(color: Colors.grey),
                 ),
                 const SizedBox(height: 24),
-                ShadButton(
+                ElevatedButton(
                   onPressed: () {
                     setState(() {
                       hasError = false;
                       error = null;
+                      stackTrace = null;
                     });
                   },
-                  child: const Text('Try Again'),
+                  child: const Text('Retry'),
                 ),
               ],
             ),
@@ -304,19 +235,17 @@ class _AppErrorBoundaryState extends State<AppErrorBoundary> {
       setState(() {
         hasError = false;
         error = null;
+        stackTrace = null;
       });
     }
   }
 
-  /// Handle errors that occur during widget building
-  void _handleError(Object error, StackTrace stackTrace) {
+  /// Handle errors in the widget tree
+  void handleError(Object error, StackTrace stackTrace) {
     setState(() {
       hasError = true;
       this.error = error;
+      this.stackTrace = stackTrace;
     });
-
-    // Log error for debugging
-    debugPrint('App Error: $error');
-    debugPrint('Stack Trace: $stackTrace');
   }
 }

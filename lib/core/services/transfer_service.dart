@@ -5,6 +5,8 @@ import 'dart:typed_data';
 import 'dart:convert';
 import 'dart:math';
 
+import 'package:flutter_shareit/core/services/storage_service.dart'
+    show StorageService;
 import 'package:injectable/injectable.dart';
 import 'package:uuid/uuid.dart';
 import 'package:crypto/crypto.dart';
@@ -16,7 +18,6 @@ import '../models/device_model.dart';
 import '../constants/file_types.dart';
 import 'connection_service.dart';
 import 'file_service.dart';
-import 'storage_service.dart';
 import 'permission_service.dart';
 
 /// Core service for handling file transfers
@@ -314,7 +315,7 @@ class TransferService {
   Future<void> _loadPendingTransfers() async {
     try {
       final transfers = await _storageService.getTransferHistory(
-        status: TransferStatus.pending,
+        limit: 5,
       );
 
       for (final transfer in transfers) {

@@ -1,456 +1,356 @@
-// App-wide constants
-// lib/core/constants/app_constants.dart
-
 /// Application-wide constants and configuration values
-/// This file contains all the static configuration values used throughout the app
+/// Designed to work seamlessly with shadcn_ui components
 class AppConstants {
-  AppConstants._(); // Private constructor to prevent instantiation
+  // Prevent instantiation
+  AppConstants._();
 
   // ═══════════════════════════════════════════════════════════════════════════════════
   // APP INFORMATION
   // ═══════════════════════════════════════════════════════════════════════════════════
 
-  /// Application name displayed in UI
-  static const String appName = 'ShareIt Pro';
-
-  /// Current application version
+  static const String appName = 'ShareNow';
   static const String appVersion = '1.0.0';
-
-  /// Build number for app stores
-  static const String appBuildNumber = '1';
-
-  /// Unique package identifier
-  static const String appPackageName = 'com.shareitpro.app';
-
-  /// Application description for stores
+  static const String appPackageName = 'com.shareit.flutter_shareit';
   static const String appDescription =
-      'Ultra-fast file sharing with modern design';
-
-  /// Developer information
-  static const String developerName = 'ShareIt Pro Team';
-  static const String developerEmail = 'support@shareitpro.com';
-  static const String supportUrl = 'https://shareitpro.com/support';
-  static const String privacyPolicyUrl = 'https://shareitpro.com/privacy';
-  static const String termsOfServiceUrl = 'https://shareitpro.com/terms';
-
-  /// App Store URLs
-  static const String appStoreUrl = 'https://apps.apple.com/app/shareit-pro';
-  static const String playStoreUrl =
-      'https://play.google.com/store/apps/details?id=$appPackageName';
-  static const String githubUrl = 'https://github.com/shareitpro/app';
+      'Fast and secure file sharing between devices';
 
   // ═══════════════════════════════════════════════════════════════════════════════════
-  // NETWORK CONFIGURATION
+  // ANIMATION & TIMING (shadcn-style)
   // ═══════════════════════════════════════════════════════════════════════════════════
 
-  /// Default port for HTTP server
-  static const int defaultPort = 8080;
+  static const int fastAnimationDuration = 150; // Quick transitions
+  static const int mediumAnimationDuration = 300; // Standard transitions
+  static const int slowAnimationDuration = 500; // Slow transitions
+  static const int extraSlowAnimationDuration = 800; // Page transitions
 
-  /// Maximum port number to try
-  static const int maxPort = 8090;
+  // Easing curves (shadcn-style)
+  static const String defaultEasing = 'ease-in-out';
+  static const String fastEasing = 'ease-out';
+  static const String slowEasing = 'ease-in';
 
-  /// Connection establishment timeout (seconds)
-  static const int connectionTimeout = 30;
+  // ═══════════════════════════════════════════════════════════════════════════════════
+  // SPACING & DIMENSIONS (shadcn design tokens)
+  // ═══════════════════════════════════════════════════════════════════════════════════
 
-  /// File transfer timeout (seconds)
-  static const int transferTimeout = 300;
+  // Spacing scale (4px base unit)
+  static const double spacing0 = 0.0;
+  static const double spacing1 = 4.0; // 0.25rem
+  static const double spacing2 = 8.0; // 0.5rem
+  static const double spacing3 = 12.0; // 0.75rem
+  static const double spacing4 = 16.0; // 1rem
+  static const double spacing5 = 20.0; // 1.25rem
+  static const double spacing6 = 24.0; // 1.5rem
+  static const double spacing8 = 32.0; // 2rem
+  static const double spacing10 = 40.0; // 2.5rem
+  static const double spacing12 = 48.0; // 3rem
+  static const double spacing16 = 64.0; // 4rem
+  static const double spacing20 = 80.0; // 5rem
 
-  /// Device discovery timeout (seconds)
-  static const int discoveryTimeout = 15;
+  // Common padding values
+  static const double defaultPadding = spacing4; // 16px
+  static const double smallPadding = spacing2; // 8px
+  static const double mediumPadding = spacing6; // 24px
+  static const double largePadding = spacing8; // 32px
+  static const double extraLargePadding = spacing12; // 48px
 
-  /// Maximum retry attempts for failed operations
+  // Border radius values (shadcn style)
+  static const double radiusNone = 0.0;
+  static const double radiusSm = 2.0;
+  static const double radiusMd = 6.0;
+  static const double radiusLg = 8.0;
+  static const double radiusXl = 12.0;
+  static const double radius2xl = 16.0;
+  static const double radius3xl = 24.0;
+  static const double radiusFull = 9999.0; // Full rounding
+
+  // Default values
+  static const double defaultBorderRadius = radiusLg;
+  static const double smallBorderRadius = radiusMd;
+  static const double largeBorderRadius = radiusXl;
+  static const double circularBorderRadius = radiusFull;
+
+  // Shadow & elevation
+  static const double shadowSm = 1.0;
+  static const double shadowMd = 3.0;
+  static const double shadowLg = 6.0;
+  static const double shadowXl = 12.0;
+  static const double shadow2xl = 24.0;
+
+  static const double defaultElevation = shadowMd;
+  static const double mediumElevation = shadowLg;
+  static const double highElevation = shadowXl;
+
+  // Icon sizes
+  static const double iconXs = 12.0;
+  static const double iconSm = 16.0;
+  static const double iconMd = 20.0;
+  static const double iconLg = 24.0;
+  static const double iconXl = 32.0;
+  static const double icon2xl = 48.0;
+
+  static const double defaultIconSize = iconLg;
+  static const double smallIconSize = iconSm;
+  static const double largeIconSize = iconXl;
+  static const double extraLargeIconSize = icon2xl;
+
+  // ═══════════════════════════════════════════════════════════════════════════════════
+  // TRANSFER & NETWORK CONFIGURATION
+  // ═══════════════════════════════════════════════════════════════════════════════════
+
+  // File transfer limits
+  static const int maxFileSize = 500 * 1024 * 1024; // 500MB per file
+  static const int maxBatchSize = 100; // Maximum files per batch
+  static const int maxTotalBatchSize = 2 * 1024 * 1024 * 1024; // 2GB total
+  static const int defaultChunkSize = 64 * 1024; // 64KB chunks
+  static const int largeFileChunkSize = 1024 * 1024; // 1MB for large files
+
+  // Network timeouts
+  static const int connectionTimeout = 30000; // 30 seconds
+  static const int transferTimeout = 300000; // 5 minutes
+  static const int discoveryTimeout = 45000; // 45 seconds
+  static const int handshakeTimeout = 10000; // 10 seconds
+
+  // Network configuration
+  static const String serviceId = 'com.shareit.flutter_shareit';
+  static const String serviceType = '_shareit._tcp';
+  static const int discoveryDuration = 30000; // 30 seconds
+  static const int advertisingDuration = 60000; // 1 minute
   static const int maxRetryAttempts = 3;
+  static const int retryDelayMs = 2000; // 2 seconds
 
-  /// Maximum concurrent file transfers
-  static const int maxConcurrentTransfers = 5;
-
-  /// Network scanning interval (milliseconds)
-  static const int networkScanInterval = 5000;
-
-  /// Keep-alive interval for connections (seconds)
-  static const int keepAliveInterval = 10;
+  // Transfer speeds (for UI indicators)
+  static const int slowSpeedThreshold = 1024 * 1024; // 1 MB/s
+  static const int mediumSpeedThreshold = 10 * 1024 * 1024; // 10 MB/s
+  static const int fastSpeedThreshold = 50 * 1024 * 1024; // 50 MB/s
 
   // ═══════════════════════════════════════════════════════════════════════════════════
-  // FILE TRANSFER CONFIGURATION
+  // STORAGE & DATABASE
   // ═══════════════════════════════════════════════════════════════════════════════════
 
-  /// Size of each file chunk during transfer (1MB)
-  static const int chunkSize = 1024 * 1024;
+  // Hive box names
+  static const String settingsBox = 'app_settings';
+  static const String transferHistoryBox = 'transfer_history';
+  static const String deviceCacheBox = 'device_cache';
+  static const String userPreferencesBox = 'user_preferences';
+  static const String fileMetadataBox = 'file_metadata';
 
-  /// Maximum file size allowed for transfer (5GB)
-  static const int maxFileSize = 5 * 1024 * 1024 * 1024;
+  // Storage keys
+  static const String keyFirstLaunch = 'first_launch';
+  static const String keyUserName = 'user_name';
+  static const String keyDeviceName = 'device_name';
+  static const String keyDeviceId = 'device_id';
+  static const String keyThemeMode = 'theme_mode';
+  static const String keyPrimaryColor = 'primary_color';
+  static const String keyLanguage = 'language';
+  static const String keyAutoAcceptFiles = 'auto_accept_files';
+  static const String keyShowNotifications = 'show_notifications';
+  static const String keyVibrateOnTransfer = 'vibrate_on_transfer';
+  static const String keySaveToGallery = 'save_to_gallery';
+  static const String keyCompressionEnabled = 'compression_enabled';
+  static const String keyEncryptionEnabled = 'encryption_enabled';
+  static const String keyLastBackupDate = 'last_backup_date';
+  static const String keyTransferStats = 'transfer_statistics';
+  static const String keyPrivacyMode = 'privacy_mode';
+  static const String keyDataSaverMode = 'data_saver_mode';
 
-  /// Maximum number of files in one transfer batch
-  static const int maxBatchSize = 1000;
-
-  /// Interval for progress updates (milliseconds)
-  static const int progressUpdateInterval = 100;
-
-  /// Interval for speed calculation updates (milliseconds)
-  static const int speedCalculationInterval = 1000;
-
-  /// Buffer size for file operations (64KB)
-  static const int fileBufferSize = 64 * 1024;
-
-  /// Minimum free space required for transfers (100MB)
-  static const int minFreeSpaceRequired = 100 * 1024 * 1024;
-
-  // ═══════════════════════════════════════════════════════════════════════════════════
-  // STORAGE CONFIGURATION
-  // ═══════════════════════════════════════════════════════════════════════════════════
-
-  /// Default download folder name
-  static const String defaultDownloadFolder = 'ShareItPro';
-
-  /// Temporary files folder
-  static const String tempFolder = 'temp';
-
-  /// Thumbnail cache folder
-  static const String thumbnailFolder = 'thumbnails';
-
-  /// Application logs folder
-  static const String logFolder = 'logs';
-
-  /// Maximum number of history items to keep
-  static const int maxHistoryItems = 1000;
-
-  /// Maximum cache size (100MB)
-  static const int maxCacheSize = 100 * 1024 * 1024;
-
-  /// Cache cleanup threshold (80% of max size)
-  static const double cacheCleanupThreshold = 0.8;
-
-  /// Thumbnail maximum size (200KB)
-  static const int maxThumbnailSize = 200 * 1024;
+  // Cache limits
+  static const int maxCacheSize = 100 * 1024 * 1024; // 100MB
+  static const int maxHistoryEntries = 1000;
+  static const int maxDeviceCacheEntries = 50;
+  static const Duration cacheExpiry = Duration(days: 30);
 
   // ═══════════════════════════════════════════════════════════════════════════════════
-  // DATABASE CONFIGURATION
+  // FILE TYPES & EXTENSIONS
   // ═══════════════════════════════════════════════════════════════════════════════════
 
-  /// Main Hive database box name
-  static const String hiveBoxName = 'shareit_pro_db';
+  // Image files
+  static const List<String> imageExtensions = [
+    'jpg',
+    'jpeg',
+    'png',
+    'gif',
+    'bmp',
+    'webp',
+    'svg',
+    'ico',
+    'tiff',
+    'tif',
+    'heic',
+    'heif',
+    'raw',
+    'dng'
+  ];
 
-  /// Settings storage box
-  static const String settingsBoxName = 'settings';
+  // Video files
+  static const List<String> videoExtensions = [
+    'mp4',
+    'avi',
+    'mov',
+    'wmv',
+    'flv',
+    'webm',
+    'mkv',
+    '3gp',
+    'm4v',
+    'mpg',
+    'mpeg',
+    'ogv',
+    'f4v',
+    'asf',
+    'rm',
+    'rmvb'
+  ];
 
-  /// Transfer history storage box
-  static const String historyBoxName = 'transfer_history';
+  // Audio files
+  static const List<String> audioExtensions = [
+    'mp3',
+    'wav',
+    'aac',
+    'flac',
+    'ogg',
+    'wma',
+    'm4a',
+    'opus',
+    'aiff',
+    'au',
+    '3ga',
+    'amr',
+    'ac3',
+    'eac3'
+  ];
 
-  /// Known devices storage box
-  static const String devicesBoxName = 'known_devices';
+  // Document files
+  static const List<String> documentExtensions = [
+    'pdf',
+    'doc',
+    'docx',
+    'xls',
+    'xlsx',
+    'ppt',
+    'pptx',
+    'txt',
+    'rtf',
+    'odt',
+    'ods',
+    'odp',
+    'pages',
+    'numbers',
+    'keynote',
+    'epub',
+    'mobi'
+  ];
 
-  /// Favorite files storage box
-  static const String favoritesBoxName = 'favorite_files';
+  // Archive files
+  static const List<String> archiveExtensions = [
+    'zip',
+    'rar',
+    '7z',
+    'tar',
+    'gz',
+    'bz2',
+    'xz',
+    'lzma',
+    'cab',
+    'iso',
+    'dmg',
+    'deb',
+    'rpm'
+  ];
 
-  /// User preferences box
-  static const String preferencesBoxName = 'preferences';
-
-  /// Statistics and analytics box
-  static const String analyticsBoxName = 'analytics';
-
-  // ═══════════════════════════════════════════════════════════════════════════════════
-  // ANIMATION & UI CONFIGURATION
-  // ═══════════════════════════════════════════════════════════════════════════════════
-
-  /// Fast animation duration (milliseconds)
-  static const int shortAnimationDuration = 200;
-
-  /// Standard animation duration (milliseconds)
-  static const int mediumAnimationDuration = 300;
-
-  /// Slow animation duration (milliseconds)
-  static const int longAnimationDuration = 500;
-
-  /// Page transition duration (milliseconds)
-  static const int pageTransitionDuration = 350;
-
-  /// List item animation stagger (milliseconds)
-  static const int staggerAnimationDelay = 50;
-
-  /// Splash screen minimum duration (milliseconds)
-  static const int splashScreenDuration = 2000;
-
-  // ═══════════════════════════════════════════════════════════════════════════════════
-  // UI LAYOUT CONFIGURATION
-  // ═══════════════════════════════════════════════════════════════════════════════════
-
-  /// Default border radius for UI elements
-  static const double defaultBorderRadius = 12.0;
-
-  /// Small border radius for compact elements
-  static const double smallBorderRadius = 8.0;
-
-  /// Large border radius for prominent elements
-  static const double largeBorderRadius = 16.0;
-
-  /// Card elevation for material design
-  static const double cardElevation = 2.0;
-
-  /// Maximum width for responsive design (tablets/desktop)
-  static const double maxContentWidth = 600.0;
-
-  /// Minimum touch target size (accessibility)
-  static const double minTouchTargetSize = 48.0;
-
-  // ═══════════════════════════════════════════════════════════════════════════════════
-  // GRID & LAYOUT CONFIGURATION
-  // ═══════════════════════════════════════════════════════════════════════════════════
-
-  /// Default grid columns for mobile
-  static const int defaultGridCrossAxisCount = 2;
-
-  /// Grid columns for tablet screens
-  static const int tabletGridCrossAxisCount = 3;
-
-  /// Grid columns for desktop screens
-  static const int desktopGridCrossAxisCount = 4;
-
-  /// Spacing between grid items
-  static const double gridSpacing = 16.0;
-
-  /// Aspect ratio for file grid items
-  static const double fileGridAspectRatio = 0.85;
-
-  /// Aspect ratio for device grid items
-  static const double deviceGridAspectRatio = 1.2;
-
-  // ═══════════════════════════════════════════════════════════════════════════════════
-  // QR CODE CONFIGURATION
-  // ═══════════════════════════════════════════════════════════════════════════════════
-
-  /// QR code display size
-  static const double qrCodeSize = 200.0;
-
-  /// QR code version for data capacity
-  static const int qrCodeVersion = 4;
-
-  /// URL scheme for QR codes
-  static const String qrCodePrefix = 'shareitpro://';
-
-  /// QR code scanning timeout (seconds)
-  static const int qrScanTimeout = 30;
-
-  /// QR code generation timeout (seconds)
-  static const int qrGenerationTimeout = 10;
-
-  // ═══════════════════════════════════════════════════════════════════════════════════
-  // HOTSPOT CONFIGURATION
-  // ═══════════════════════════════════════════════════════════════════════════════════
-
-  /// Default WiFi hotspot SSID prefix
-  static const String defaultHotspotSSID = 'ShareItPro_';
-
-  /// Default WiFi hotspot password
-  static const String defaultHotspotPassword = 'shareit123';
-
-  /// WiFi channel for hotspot (recommended: 6 or 11)
-  static const int hotspotChannel = 6;
-
-  /// Maximum devices that can connect to hotspot
-  static const int maxHotspotClients = 8;
-
-  /// Hotspot auto-disable timeout (minutes)
-  static const int hotspotAutoDisableTimeout = 10;
+  // Application files
+  static const List<String> applicationExtensions = [
+    'apk',
+    'ipa',
+    'exe',
+    'msi',
+    'dmg',
+    'pkg',
+    'deb',
+    'rpm',
+    'appimage'
+  ];
 
   // ═══════════════════════════════════════════════════════════════════════════════════
-  // SECURITY CONFIGURATION
+  // UI STRINGS & MESSAGES
   // ═══════════════════════════════════════════════════════════════════════════════════
 
-  /// AES encryption key size for secure transfers
-  static const int encryptionKeySize = 256;
+  // Error messages
+  static const String errorGeneral = 'Something went wrong';
+  static const String errorNetwork = 'Connection failed';
+  static const String errorPermission = 'Permission required';
+  static const String errorFileNotFound = 'File not found';
+  static const String errorTransferFailed = 'Transfer failed';
+  static const String errorDeviceNotFound = 'Device not found';
+  static const String errorConnectionTimeout = 'Connection timeout';
+  static const String errorFileTooLarge = 'File too large';
+  static const String errorInsufficientSpace = 'Insufficient storage space';
+  static const String errorUnsupportedFormat = 'Unsupported file format';
 
-  /// Device authentication token expiry (hours)
-  static const int authTokenExpiry = 24;
+  // Success messages
+  static const String successTransferComplete = 'Transfer completed';
+  static const String successFilesSaved = 'Files saved successfully';
+  static const String successDeviceConnected = 'Device connected';
+  static const String successSettingsSaved = 'Settings saved';
+  static const String successBackupCreated = 'Backup created';
 
-  /// Maximum failed authentication attempts
-  static const int maxAuthAttempts = 3;
-
-  /// Security lockout duration after failed attempts (minutes)
-  static const int securityLockoutDuration = 15;
-
-  // ═══════════════════════════════════════════════════════════════════════════════════
-  // PERFORMANCE CONFIGURATION
-  // ═══════════════════════════════════════════════════════════════════════════════════
-
-  /// Maximum memory usage for file operations (50MB)
-  static const int maxMemoryUsage = 50 * 1024 * 1024;
-
-  /// Background task timeout (seconds)
-  static const int backgroundTaskTimeout = 600;
-
-  /// Image compression quality (0-100)
-  static const int imageCompressionQuality = 85;
-
-  /// Maximum concurrent network operations
-  static const int maxConcurrentNetworkOps = 10;
+  // Info messages
+  static const String infoScanning = 'Scanning for devices...';
+  static const String infoConnecting = 'Connecting to device...';
+  static const String infoTransferring = 'Transferring files...';
+  static const String infoPreparing = 'Preparing files...';
+  static const String infoWaiting = 'Waiting for response...';
 
   // ═══════════════════════════════════════════════════════════════════════════════════
-  // NOTIFICATION CONFIGURATION
+  // VALIDATION RULES
   // ═══════════════════════════════════════════════════════════════════════════════════
 
-  /// Transfer progress notification update interval (seconds)
-  static const int notificationUpdateInterval = 2;
+  static const int minUsernameLength = 2;
+  static const int maxUsernameLength = 30;
+  static const int minDeviceNameLength = 2;
+  static const int maxDeviceNameLength = 40;
+  static const int minPasswordLength = 8;
+  static const int maxPasswordLength = 128;
 
-  /// Notification channel ID for transfers
-  static const String transferNotificationChannelId = 'transfer_progress';
-
-  /// Notification channel ID for general updates
-  static const String generalNotificationChannelId = 'general_updates';
+  // Regex patterns
+  static const String usernamePattern = r'^[a-zA-Z0-9_\s-]+$';
+  static const String deviceNamePattern = r'^[a-zA-Z0-9_\s-]+$';
+  static const String emailPattern =
+      r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$';
 
   // ═══════════════════════════════════════════════════════════════════════════════════
-  // FEATURE FLAGS
+  // EXTERNAL LINKS & URLS
   // ═══════════════════════════════════════════════════════════════════════════════════
 
-  /// Enable WiFi Direct functionality
-  static const bool enableWifiDirect = true;
+  static const String privacyPolicyUrl = 'https://sharenow.app/privacy';
+  static const String termsOfServiceUrl = 'https://sharenow.app/terms';
+  static const String supportUrl = 'https://sharenow.app/support';
+  static const String githubUrl = 'https://github.com/sharenow/flutter_shareit';
+  static const String websiteUrl = 'https://sharenow.app';
+  static const String feedbackUrl = 'https://sharenow.app/feedback';
 
-  /// Enable WiFi Hotspot functionality
-  static const bool enableHotspot = true;
+  // ═══════════════════════════════════════════════════════════════════════════════════
+  // FEATURE FLAGS & CONFIGURATION
+  // ═══════════════════════════════════════════════════════════════════════════════════
 
-  /// Enable Bluetooth transfers
-  static const bool enableBluetooth = true;
-
-  /// Enable QR code sharing
-  static const bool enableQRSharing = true;
-
-  /// Enable file compression
-  static const bool enableFileCompression = true;
-
-  /// Enable file encryption (future feature)
-  static const bool enableFileEncryption = false;
-
-  /// Enable cloud sync (future feature)
-  static const bool enableCloudSync = false;
-
-  /// Enable analytics collection
-  static const bool enableAnalytics = true;
-
-  /// Enable crash reporting
-  static const bool enableCrashReporting = true;
-
-  /// Enable beta features
+  static const bool enableQRCodeSharing = true;
+  static const bool enableCloudBackup = false;
   static const bool enableBetaFeatures = false;
+  static const bool enableAnalytics = true;
+  static const bool enableCrashReporting = true;
+  static const bool enableEncryption = true;
+  static const bool enableCompression = true;
+  static const bool enableNotifications = true;
+  static const bool enableVibration = true;
 
-  // ═══════════════════════════════════════════════════════════════════════════════════
-  // ERROR MESSAGES
-  // ═══════════════════════════════════════════════════════════════════════════════════
+  // Rate limiting
+  static const int maxTransfersPerMinute = 15;
+  static const int maxConnectionsPerDevice = 5;
+  static const int rateLimitWindowMinutes = 1;
+  static const int maxConcurrentTransfers = 3;
 
-  static const String genericErrorMessage =
-      'Something went wrong. Please try again.';
-  static const String networkErrorMessage =
-      'Network connection failed. Please check your connection.';
-  static const String permissionErrorMessage =
-      'Permission required to continue.';
-  static const String fileNotFoundMessage = 'File not found or has been moved.';
-  static const String transferFailedMessage =
-      'Transfer failed. Please try again.';
-  static const String storageFullMessage =
-      'Not enough storage space available.';
-  static const String connectionTimeoutMessage =
-      'Connection timed out. Please try again.';
-  static const String deviceNotFoundMessage = 'No devices found nearby.';
-  static const String invalidFileMessage = 'Invalid or corrupted file.';
-  static const String securityErrorMessage = 'Security verification failed.';
-
-  // ═══════════════════════════════════════════════════════════════════════════════════
-  // SUCCESS MESSAGES
-  // ═══════════════════════════════════════════════════════════════════════════════════
-
-  static const String transferCompleteMessage =
-      'Transfer completed successfully!';
-  static const String connectionEstablishedMessage =
-      'Connected to device successfully!';
-  static const String filesSavedMessage = 'Files saved to downloads folder.';
-  static const String settingsSavedMessage = 'Settings saved successfully.';
-  static const String devicePairedMessage = 'Device paired successfully.';
-  static const String qrCodeGeneratedMessage =
-      'QR code generated successfully.';
-
-  // ═══════════════════════════════════════════════════════════════════════════════════
-  // ANALYTICS EVENTS
-  // ═══════════════════════════════════════════════════════════════════════════════════
-
-  static const String eventAppStart = 'app_start';
-  static const String eventAppBackground = 'app_background';
-  static const String eventAppForeground = 'app_foreground';
-  static const String eventFileSelect = 'file_select';
-  static const String eventDeviceConnect = 'device_connect';
-  static const String eventDeviceDisconnect = 'device_disconnect';
-  static const String eventTransferStart = 'transfer_start';
-  static const String eventTransferComplete = 'transfer_complete';
-  static const String eventTransferFailed = 'transfer_failed';
-  static const String eventTransferCancelled = 'transfer_cancelled';
-  static const String eventQRGenerate = 'qr_generate';
-  static const String eventQRScan = 'qr_scan';
-  static const String eventSettingsChange = 'settings_change';
-  static const String eventErrorOccurred = 'error_occurred';
-  static const String eventFeatureUsed = 'feature_used';
-
-  // ═══════════════════════════════════════════════════════════════════════════════════
-  // BREAKPOINTS FOR RESPONSIVE DESIGN
-  // ═══════════════════════════════════════════════════════════════════════════════════
-
-  /// Mobile breakpoint (phones)
-  static const double mobileBreakpoint = 480.0;
-
-  /// Tablet breakpoint
-  static const double tabletBreakpoint = 768.0;
-
-  /// Desktop breakpoint
-  static const double desktopBreakpoint = 1024.0;
-
-  /// Large desktop breakpoint
-  static const double largeDesktopBreakpoint = 1440.0;
-
-  static double defaultPadding = 5;
-
-  static double sectionSpacing = 5;
-
-  // ═══════════════════════════════════════════════════════════════════════════════════
-  // UTILITY METHODS
-  // ═══════════════════════════════════════════════════════════════════════════════════
-
-  /// Check if the app is in debug mode
-  static bool get isDebugMode {
-    bool debugMode = false;
-    assert(debugMode = true);
-    return debugMode;
-  }
-
-  /// Get timeout for specific operation type
-  static int getTimeoutForOperation(String operationType) {
-    switch (operationType.toLowerCase()) {
-      case 'connection':
-        return connectionTimeout;
-      case 'transfer':
-        return transferTimeout;
-      case 'discovery':
-        return discoveryTimeout;
-      case 'qr_scan':
-        return qrScanTimeout;
-      default:
-        return connectionTimeout;
-    }
-  }
-
-  /// Get appropriate grid count based on screen width
-  static int getGridCount(double screenWidth) {
-    if (screenWidth >= desktopBreakpoint) {
-      return desktopGridCrossAxisCount;
-    } else if (screenWidth >= tabletBreakpoint) {
-      return tabletGridCrossAxisCount;
-    } else {
-      return defaultGridCrossAxisCount;
-    }
-  }
-
-  /// Check if screen size is mobile
-  static bool isMobile(double screenWidth) => screenWidth < tabletBreakpoint;
-
-  /// Check if screen size is tablet
-  static bool isTablet(double screenWidth) =>
-      screenWidth >= tabletBreakpoint && screenWidth < desktopBreakpoint;
-
-  /// Check if screen size is desktop
-  static bool isDesktop(double screenWidth) => screenWidth >= desktopBreakpoint;
+  // Performance settings
+  static const int memoryThresholdMB = 100;
+  static const int batteryThresholdPercent = 15;
+  static const bool enableBackgroundTransfer = true;
+  static const bool enableLowPowerMode = true;
 }

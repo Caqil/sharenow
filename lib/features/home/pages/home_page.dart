@@ -56,7 +56,8 @@ class _HomePageState extends State<HomePage>
 
   void _setupAnimations() {
     _animationController = AnimationController(
-      duration: Duration(milliseconds: AppConstants.mediumAnimationDuration),
+      duration:
+          const Duration(milliseconds: AppConstants.mediumAnimationDuration),
       vsync: this,
     );
 
@@ -127,16 +128,16 @@ class _HomePageState extends State<HomePage>
               child: SlideTransition(
                 position: _slideAnimation,
                 child: Padding(
-                  padding: EdgeInsets.all(AppConstants.defaultPadding),
+                  padding: const EdgeInsets.all(AppConstants.defaultPadding),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       _buildWelcomeSection(),
-                      SizedBox(height: AppConstants.sectionSpacing),
+                      const SizedBox(height: AppConstants.defaultPadding),
                       _buildStatsSection(),
-                      SizedBox(height: AppConstants.sectionSpacing),
+                      const SizedBox(height: AppConstants.defaultPadding),
                       _buildQuickActions(),
-                      SizedBox(height: AppConstants.sectionSpacing),
+                      const SizedBox(height: AppConstants.defaultPadding),
                       _buildRecentTransfers(),
                       SizedBox(height: context.mediaQuery.padding.bottom),
                     ],
@@ -179,7 +180,7 @@ class _HomePageState extends State<HomePage>
       surfaceTintColor: Colors.transparent,
       elevation: 0,
       flexibleSpace: FlexibleSpaceBar(
-        titlePadding: EdgeInsets.only(
+        titlePadding: const EdgeInsets.only(
           left: AppConstants.defaultPadding,
           bottom: 16,
         ),
@@ -234,7 +235,7 @@ class _HomePageState extends State<HomePage>
 
     return Container(
       width: double.infinity,
-      padding: EdgeInsets.all(AppConstants.defaultPadding),
+      padding: const EdgeInsets.all(AppConstants.defaultPadding),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topLeft,
