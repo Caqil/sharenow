@@ -1,1 +1,1 @@
-// Main ShadApp setup
+// Main ShadApp

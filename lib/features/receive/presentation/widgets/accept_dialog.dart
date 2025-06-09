@@ -1,1 +1,0 @@
-// ShadDialog accept/reject

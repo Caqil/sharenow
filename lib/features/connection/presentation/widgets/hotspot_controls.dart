@@ -1,1 +1,0 @@
-// Hotspot UI controls

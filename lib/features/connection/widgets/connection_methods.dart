@@ -1,0 +1,1 @@
+// Connection methods widget
