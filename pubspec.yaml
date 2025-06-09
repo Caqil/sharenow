@@ -81,6 +81,7 @@ dependencies:
   json_serializable: ^6.7.1
   google_fonts: ^6.2.1
   font_awesome_flutter: ^10.8.0
+  flutter_bluetooth_serial: ^0.4.0
 
 dev_dependencies:
   flutter_test:

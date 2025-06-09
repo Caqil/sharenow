@@ -24,6 +24,12 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSBluetoothAlwaysUsageDescription</key>
+<string>Need Bluetooth access for device discovery and connection</string>
+<key>NSLocalNetworkUsageDescription</key>
+<string>Need local network access for WiFi and hotspot connections</string>
+<key>NSLocationWhenInUseUsageDescription</key>
+<string>Need location access for WiFi and Bluetooth discovery</string>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIMainStoryboardFile</key>

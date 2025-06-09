@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:nativewrappers/_internal/vm/lib/math_patch.dart' as math;
 import 'dart:typed_data';
 import 'dart:convert';
 import 'dart:math';
@@ -52,8 +53,10 @@ class TransferService {
   );
 
   // Getters
-  Stream<TransferModel> get transferUpdates => _transferUpdatesController.stream;
-  Stream<TransferRequestEvent> get transferRequests => _transferRequestsController.stream;
+  Stream<TransferModel> get transferUpdates =>
+      _transferUpdatesController.stream;
+  Stream<TransferRequestEvent> get transferRequests =>
+      _transferRequestsController.stream;
   List<TransferModel> get activeTransfers => _activeTransfers.values.toList();
   bool get hasActiveTransfers => _activeTransfers.isNotEmpty;
 
@@ -67,7 +70,8 @@ class TransferService {
       // Load pending transfers from storage
       await _loadPendingTransfers();
     } catch (e) {
-      throw TransferServiceException('Failed to initialize transfer service: $e');
+      throw TransferServiceException(
+          'Failed to initialize transfer service: $e');
     }
   }
 
@@ -101,7 +105,8 @@ class TransferService {
         remoteDevice: targetDevice,
         createdAt: DateTime.now(),
         totalSize: totalSize,
-        connectionType: _connectionService.activeConnectionType ?? ConnectionType.p2p,
+        connectionType:
+            _connectionService.activeConnectionType ?? ConnectionType.p2p,
         sessionId: sessionId,
         metadata: metadata ?? {},
       );
@@ -120,7 +125,8 @@ class TransferService {
   }
 
   /// Accept incoming transfer request
-  Future<bool> acceptTransfer(String transferId, {String? destinationPath}) async {
+  Future<bool> acceptTransfer(String transferId,
+      {String? destinationPath}) async {
     try {
       final transfer = _activeTransfers[transferId];
       if (transfer == null) {
@@ -313,7 +319,7 @@ class TransferService {
 
       for (final transfer in transfers) {
         _activeTransfers[transfer.id] = transfer;
-        
+
         // Restart pending send transfers
         if (transfer.direction == TransferDirection.send) {
           _startSendTransfer(transfer);
@@ -408,14 +414,19 @@ class TransferService {
   }
 
   Future<void> _sendTransferRequest(TransferModel transfer) async {
+    // Create FileMetadata objects with async operations
+    final fileMetadataFutures = transfer.files.map((f) async => FileMetadata(
+          name: f.name,
+          size: f.size,
+          mimeType: f.mimeType,
+          hash: await _fileService.getFileHash(f.path),
+        ));
+
+    final files = await Future.wait(fileMetadataFutures);
+
     final request = TransferRequestMessage(
       sessionId: transfer.sessionId!,
-      files: transfer.files.map((f) => FileMetadata(
-        name: f.name,
-        size: f.size,
-        mimeType: f.mimeType,
-        hash: await _fileService.getFileHash(f.path),
-      )).toList(),
+      files: files,
       totalSize: transfer.totalSize,
       deviceInfo: await _getLocalDeviceInfo(),
     );
@@ -432,8 +443,8 @@ class TransferService {
       try {
         final data = utf8.decode(event.data);
         final json = jsonDecode(data) as Map<String, dynamic>;
-        
-        if (json['type'] == 'transfer_response' && 
+
+        if (json['type'] == 'transfer_response' &&
             json['sessionId'] == sessionId) {
           subscription.cancel();
           completer.complete(json['accepted'] == true);
@@ -456,10 +467,10 @@ class TransferService {
 
   Future<void> _sendFiles(TransferModel transfer) async {
     int totalTransferred = 0;
-    
+
     for (int i = 0; i < transfer.files.length; i++) {
       final file = transfer.files[i];
-      
+
       // Update progress for current file
       final updatedTransfer = transfer.updateProgress(
         currentFileIndex: i,
@@ -474,14 +485,17 @@ class TransferService {
         // Update progress
         final progress = transfer.updateProgress(
           transferredBytes: totalTransferred + bytesTransferred,
-          percentage: ((totalTransferred + bytesTransferred) / transfer.totalSize) * 100,
+          percentage:
+              ((totalTransferred + bytesTransferred) / transfer.totalSize) *
+                  100,
           currentFileTransferred: bytesTransferred,
           speed: _calculateSpeed(transfer.id, bytesTransferred),
-          remainingTime: _calculateRemainingTime(transfer.id, totalTransferred + bytesTransferred, transfer.totalSize),
+          remainingTime: _calculateRemainingTime(transfer.id,
+              totalTransferred + bytesTransferred, transfer.totalSize),
         );
         _updateTransfer(progress);
       });
-      
+
       totalTransferred += file.size;
     }
   }
@@ -493,16 +507,16 @@ class TransferService {
   ) async {
     final fileData = await _fileService.readFileAsBytes(file.path);
     final totalChunks = (fileData.length / _chunkSize).ceil();
-    
+
     int bytesSent = 0;
-    
+
     for (int i = 0; i < totalChunks; i++) {
       // Check if transfer is cancelled or paused
       final transfer = _activeTransfers[transferId];
       if (transfer == null || transfer.status == TransferStatus.cancelled) {
         throw TransferServiceException('Transfer cancelled');
       }
-      
+
       if (transfer.status == TransferStatus.paused) {
         // Wait until resumed
         while (transfer.status == TransferStatus.paused) {
@@ -525,7 +539,7 @@ class TransferService {
 
       // Send chunk with retry logic
       await _sendChunkWithRetry(chunkMessage);
-      
+
       bytesSent += chunk.length;
       onProgress(bytesSent);
     }
@@ -533,21 +547,22 @@ class TransferService {
 
   Future<void> _sendChunkWithRetry(FileChunkMessage chunk) async {
     int retries = 0;
-    
+
     while (retries < _maxRetries) {
       try {
         final data = utf8.encode(jsonEncode(chunk.toJson()));
         await _connectionService.sendData(Uint8List.fromList(data));
-        
+
         // Wait for acknowledgment
         await _waitForChunkAck(chunk.chunkIndex);
         return;
       } catch (e) {
         retries++;
         if (retries >= _maxRetries) {
-          throw TransferServiceException('Failed to send chunk after $retries retries: $e');
+          throw TransferServiceException(
+              'Failed to send chunk after $retries retries: $e');
         }
-        
+
         // Wait before retry
         await Future.delayed(Duration(milliseconds: 500 * retries));
       }
@@ -562,7 +577,7 @@ class TransferService {
       try {
         final data = utf8.decode(event.data);
         final json = jsonDecode(data) as Map<String, dynamic>;
-        
+
         if (json['type'] == 'chunk_ack' && json['chunkIndex'] == chunkIndex) {
           subscription.cancel();
           completer.complete();
@@ -576,7 +591,8 @@ class TransferService {
     Timer(_chunkTimeout, () {
       if (!completer.isCompleted) {
         subscription.cancel();
-        completer.completeError(TimeoutException('Chunk acknowledgment timeout'));
+        completer
+            .completeError(TimeoutException('Chunk acknowledgment timeout'));
       }
     });
 
@@ -606,7 +622,7 @@ class TransferService {
     try {
       final data = utf8.decode(event.data);
       final json = jsonDecode(data) as Map<String, dynamic>;
-      
+
       switch (json['type']) {
         case 'transfer_request':
           _handleTransferRequest(TransferRequestMessage.fromJson(json));
@@ -634,25 +650,28 @@ class TransferService {
       // Create transfer model for incoming request
       final transfer = TransferModel(
         id: _uuid.v4(),
-        files: request.files.map((fm) => FileModel(
-          id: _uuid.v4(),
-          name: fm.name,
-          path: '', // Will be set when saving
-          size: fm.size,
-          mimeType: fm.mimeType,
-          extension: path.extension(fm.name),
-          dateCreated: DateTime.now(),
-          dateModified: DateTime.now(),
-          isDirectory: false,
-          fileType: FileTypeDetector.fromMimeType(fm.mimeType),
-          metadata: {'hash': fm.hash},
-        )).toList(),
+        files: request.files
+            .map((fm) => FileModel(
+                  id: _uuid.v4(),
+                  name: fm.name,
+                  path: '', // Will be set when saving
+                  size: fm.size,
+                  mimeType: fm.mimeType,
+                  extension: path.extension(fm.name),
+                  dateCreated: DateTime.now(),
+                  dateModified: DateTime.now(),
+                  isDirectory: false,
+                  fileType: FileTypeDetector.fromMimeType(fm.mimeType),
+                  metadata: {'hash': fm.hash},
+                ))
+            .toList(),
         status: TransferStatus.pending,
         direction: TransferDirection.receive,
         remoteDevice: request.deviceInfo,
         createdAt: DateTime.now(),
         totalSize: request.totalSize,
-        connectionType: _connectionService.activeConnectionType ?? ConnectionType.p2p,
+        connectionType:
+            _connectionService.activeConnectionType ?? ConnectionType.p2p,
         sessionId: request.sessionId,
       );
 
@@ -678,7 +697,7 @@ class TransferService {
     // Handle incoming file chunk
     // This would involve writing to a temporary file and tracking progress
     // Implementation depends on the specific transfer being received
-    
+
     // Send acknowledgment
     _sendChunkAcknowledgment(chunk.chunkIndex);
   }
@@ -711,7 +730,7 @@ class TransferService {
   void _handleConnectionFailed() {
     // Fail all pending/connecting transfers
     for (final transfer in _activeTransfers.values) {
-      if (transfer.status == TransferStatus.pending || 
+      if (transfer.status == TransferStatus.pending ||
           transfer.status == TransferStatus.connecting) {
         final errorTransfer = transfer.updateStatus(
           TransferStatus.failed,
@@ -744,7 +763,8 @@ class TransferService {
     }
   }
 
-  Future<void> _sendTransferResponse(String sessionId, bool accepted, [String? reason]) async {
+  Future<void> _sendTransferResponse(String sessionId, bool accepted,
+      [String? reason]) async {
     final response = {
       'type': 'transfer_response',
       'sessionId': sessionId,
@@ -821,7 +841,7 @@ class TransferService {
     _activeTransfers.remove(transferId);
     _transferSubscriptions[transferId]?.cancel();
     _transferSubscriptions.remove(transferId);
-    
+
     final completer = _transferCompleters.remove(transferId);
     if (completer != null && !completer.isCompleted) {
       completer.complete(false);
@@ -855,17 +875,19 @@ class TransferRequestMessage {
   });
 
   Map<String, dynamic> toJson() => {
-    'type': 'transfer_request',
-    'sessionId': sessionId,
-    'files': files.map((f) => f.toJson()).toList(),
-    'totalSize': totalSize,
-    'deviceInfo': deviceInfo.toJson(),
-  };
+        'type': 'transfer_request',
+        'sessionId': sessionId,
+        'files': files.map((f) => f.toJson()).toList(),
+        'totalSize': totalSize,
+        'deviceInfo': deviceInfo.toJson(),
+      };
 
   factory TransferRequestMessage.fromJson(Map<String, dynamic> json) =>
       TransferRequestMessage(
         sessionId: json['sessionId'],
-        files: (json['files'] as List).map((f) => FileMetadata.fromJson(f)).toList(),
+        files: (json['files'] as List)
+            .map((f) => FileMetadata.fromJson(f))
+            .toList(),
         totalSize: json['totalSize'],
         deviceInfo: DeviceModel.fromJson(json['deviceInfo']),
       );
@@ -885,18 +907,18 @@ class FileMetadata {
   });
 
   Map<String, dynamic> toJson() => {
-    'name': name,
-    'size': size,
-    'mimeType': mimeType,
-    'hash': hash,
-  };
+        'name': name,
+        'size': size,
+        'mimeType': mimeType,
+        'hash': hash,
+      };
 
   factory FileMetadata.fromJson(Map<String, dynamic> json) => FileMetadata(
-    name: json['name'],
-    size: json['size'],
-    mimeType: json['mimeType'],
-    hash: json['hash'],
-  );
+        name: json['name'],
+        size: json['size'],
+        mimeType: json['mimeType'],
+        hash: json['hash'],
+      );
 }
 
 class FileChunkMessage {
@@ -915,13 +937,13 @@ class FileChunkMessage {
   });
 
   Map<String, dynamic> toJson() => {
-    'type': 'file_chunk',
-    'fileIndex': fileIndex,
-    'chunkIndex': chunkIndex,
-    'totalChunks': totalChunks,
-    'data': base64Encode(data),
-    'hash': hash,
-  };
+        'type': 'file_chunk',
+        'fileIndex': fileIndex,
+        'chunkIndex': chunkIndex,
+        'totalChunks': totalChunks,
+        'data': base64Encode(data),
+        'hash': hash,
+      };
 
   factory FileChunkMessage.fromJson(Map<String, dynamic> json) =>
       FileChunkMessage(

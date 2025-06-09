@@ -9,6 +9,8 @@ import 'package:wifi_iot/wifi_iot.dart';
 import 'package:network_info_plus/network_info_plus.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:device_info_plus/device_info_plus.dart';
+import 'package:flutter_bluetooth_serial/flutter_bluetooth_serial.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 import '../models/device_model.dart';
 import '../models/transfer_model.dart';
@@ -22,14 +24,17 @@ class ConnectionService {
   final NetworkInfo _networkInfo = NetworkInfo();
   final Connectivity _connectivity = Connectivity();
   final DeviceInfoPlugin _deviceInfo = DeviceInfoPlugin();
+  final FlutterBluetoothSerial _bluetooth = FlutterBluetoothSerial.instance;
 
   // Connection state
   final Map<String, DeviceModel> _discoveredDevices = {};
   final Map<String, StreamSubscription> _connectionSubscriptions = {};
+  final Map<String, BluetoothConnection> _bluetoothConnections = {};
   String? _currentEndpointId;
   ConnectionType? _activeConnectionType;
   bool _isDiscovering = false;
   bool _isAdvertising = false;
+  ServerSocket? _wifiServer;
 
   // Stream controllers
   final StreamController<List<DeviceModel>> _devicesController =
@@ -53,14 +58,11 @@ class ConnectionService {
   /// Initialize the connection service
   Future<void> initialize() async {
     try {
-      // Check permissions
       await _permissionService.requestConnectionPermissions();
-
-      // Initialize Nearby Connections
-      await _initializeNearbyConnections();
-
-      // Start monitoring connectivity changes
       _connectivity.onConnectivityChanged.listen(_onConnectivityChanged);
+      if (Platform.isAndroid) {
+        await _bluetooth.requestEnable();
+      }
     } catch (e) {
       throw ConnectionException('Failed to initialize connection service: $e');
     }
@@ -71,9 +73,7 @@ class ConnectionService {
     ConnectionType type = ConnectionType.p2p,
     Duration timeout = const Duration(seconds: 30),
   }) async {
-    if (_isDiscovering) {
-      await stopDiscovering();
-    }
+    if (_isDiscovering) await stopDiscovering();
 
     try {
       _isDiscovering = true;
@@ -98,7 +98,6 @@ class ConnectionService {
           throw ConnectionException('Unsupported connection type: $type');
       }
 
-      // Auto-stop discovery after timeout
       Timer(timeout, () {
         if (_isDiscovering) stopDiscovering();
       });
@@ -120,33 +119,41 @@ class ConnectionService {
           await Nearby().stopDiscovery();
           break;
         case ConnectionType.wifi:
+          _connectionSubscriptions.forEach((key, sub) => sub.cancel());
+          _connectionSubscriptions.clear();
+          break;
         case ConnectionType.hotspot:
+          _connectionSubscriptions.forEach((key, sub) => sub.cancel());
+          _connectionSubscriptions.clear();
+          break;
         case ConnectionType.bluetooth:
-          // Stop respective discovery methods
+          _connectionSubscriptions.forEach((key, sub) => sub.cancel());
+          _connectionSubscriptions.clear();
+          if (Platform.isAndroid) {
+            await _bluetooth.cancelDiscovery();
+          }
           break;
         default:
           break;
       }
 
       _activeConnectionType = null;
+      _emitDevicesUpdate();
     } catch (e) {
       throw ConnectionException('Failed to stop discovery: $e');
     }
   }
 
-  /// Start advertising device for others to discover
+  /// Start advertising device
   Future<void> startAdvertising({
     ConnectionType type = ConnectionType.p2p,
     String? customName,
   }) async {
-    if (_isAdvertising) {
-      await stopAdvertising();
-    }
+    if (_isAdvertising) await stopAdvertising();
 
     try {
       _isAdvertising = true;
       _activeConnectionType = type;
-
       final deviceInfo = await _getDeviceInfo();
       final advertiseName = customName ?? deviceInfo.name;
 
@@ -184,9 +191,18 @@ class ConnectionService {
           await Nearby().stopAdvertising();
           break;
         case ConnectionType.wifi:
+          if (_wifiServer != null) {
+            await _wifiServer!.close();
+            _wifiServer = null;
+          }
+          break;
         case ConnectionType.hotspot:
+          await WiFiForIoTPlugin.setWiFiAPEnabled(false);
+          break;
         case ConnectionType.bluetooth:
-          // Stop respective advertising methods
+          if (Platform.isAndroid) {
+            _connectionSubscriptions['bluetooth_server']?.cancel();
+          }
           break;
         default:
           break;
@@ -244,9 +260,17 @@ class ConnectionService {
           await Nearby().disconnectFromEndpoint(_currentEndpointId!);
           break;
         case ConnectionType.wifi:
+          _connectionSubscriptions.remove('wifi_$_currentEndpointId')?.cancel();
+          break;
         case ConnectionType.hotspot:
+          await WiFiForIoTPlugin.disconnect();
+          break;
         case ConnectionType.bluetooth:
-          // Implement respective disconnect methods
+          final connection = _bluetoothConnections[_currentEndpointId];
+          if (connection != null) {
+            await connection.close();
+            _bluetoothConnections.remove(_currentEndpointId);
+          }
           break;
         default:
           break;
@@ -271,10 +295,17 @@ class ConnectionService {
           await Nearby().sendBytesPayload(_currentEndpointId!, data);
           return true;
         case ConnectionType.wifi:
+          return await _sendDataOverNetwork(data, _currentEndpointId!);
         case ConnectionType.hotspot:
+          return await _sendDataOverNetwork(data, _currentEndpointId!);
         case ConnectionType.bluetooth:
-          // Implement respective send methods
-          return await _sendDataOverNetwork(data);
+          final connection = _bluetoothConnections[_currentEndpointId];
+          if (connection != null) {
+            connection.output.add(data);
+            await connection.output.allSent;
+            return true;
+          }
+          return false;
         default:
           return false;
       }
@@ -311,20 +342,15 @@ class ConnectionService {
   Future<ConnectionSpeed> testConnectionSpeed(DeviceModel device) async {
     try {
       final stopwatch = Stopwatch()..start();
-
-      // Send test data (1KB)
       final testData = Uint8List.fromList(List.filled(1024, 0));
       await sendData(testData);
-
       stopwatch.stop();
       final latency = stopwatch.elapsedMicroseconds / 1000; // ms
-
-      // Estimate speed based on test
       final speed = (testData.length * 1000) / latency; // bytes per second
 
       return ConnectionSpeed(
         uploadSpeed: speed,
-        downloadSpeed: speed, // Simplified - same as upload
+        downloadSpeed: speed,
         latency: latency,
         quality: _getConnectionQuality(speed, latency),
       );
@@ -343,9 +369,52 @@ class ConnectionService {
         throw ConnectionException('Location permission required');
       }
 
-      return await WiFiForIoTPlugin.setWiFiAPSSID(ssid, password);
+      final ssidResult = await WiFiForIoTPlugin.setWiFiAPSSID(ssid);
+      if (!ssidResult) throw ConnectionException('Failed to set hotspot SSID');
+
+      final passwordResult =
+          await WiFiForIoTPlugin.setWiFiAPPreSharedKey(password);
+      if (!passwordResult) {
+        throw ConnectionException('Failed to set hotspot password');
+      }
+
+      return await WiFiForIoTPlugin.setWiFiAPEnabled(true);
     } catch (e) {
       throw ConnectionException('Failed to create hotspot: $e');
+    }
+  }
+
+  /// Accept connection request
+  Future<bool> acceptConnection(String endpointId) async {
+    try {
+      return await Nearby().acceptConnection(
+        endpointId,
+        onPayLoadRecieved: (endpointId, payload) {
+          if (payload.type == PayloadType.BYTES) {
+            _dataController.add(DataReceivedEvent(endpointId, payload.bytes!));
+          } else if (payload.type == PayloadType.FILE) {
+            _dataController.add(DataReceivedEvent(
+                endpointId, Uint8List.fromList(utf8.encode('File received'))));
+          }
+        },
+        onPayloadTransferUpdate: (endpointId, update) {
+          _dataController.add(DataReceivedEvent(
+            endpointId,
+            Uint8List.fromList(utf8.encode('TransferUpdate: ${update.status}')),
+          ));
+        },
+      );
+    } catch (e) {
+      throw ConnectionException('Failed to accept connection: $e');
+    }
+  }
+
+  /// Reject connection request
+  Future<bool> rejectConnection(String endpointId) async {
+    try {
+      return await Nearby().rejectConnection(endpointId);
+    } catch (e) {
+      throw ConnectionException('Failed to reject connection: $e');
     }
   }
 
@@ -354,9 +423,13 @@ class ConnectionService {
     _isDiscovering = false;
     _isAdvertising = false;
 
-    _connectionSubscriptions.values.forEach((sub) => sub.cancel());
+    _connectionSubscriptions.forEach((key, sub) => sub.cancel());
     _connectionSubscriptions.clear();
 
+    _bluetoothConnections.forEach((key, conn) => conn.close());
+    _bluetoothConnections.clear();
+
+    _wifiServer?.close();
     _devicesController.close();
     _connectionController.close();
     _dataController.close();
@@ -368,53 +441,68 @@ class ConnectionService {
 
   // Private methods
 
-  Future<void> _initializeNearbyConnections() async {
-    bool initialized = await Nearby().initialize(
-      'flutter_shareit',
-      Strategy.P2P_CLUSTER,
-      enableBluetooth: true,
-    );
-
-    if (!initialized) {
-      throw ConnectionException('Failed to initialize Nearby Connections');
-    }
-  }
-
   Future<void> _startP2PDiscovery(Duration timeout) async {
-    bool started = await Nearby().startDiscovery(
-      'flutter_shareit_user',
-      Strategy.P2P_CLUSTER,
-      onEndpointFound: _onP2PEndpointFound,
-      onEndpointLost: _onP2PEndpointLost,
-    );
-
-    if (!started) {
-      throw ConnectionException('Failed to start P2P discovery');
+    try {
+      bool started = await Nearby().startDiscovery(
+        'flutter_shareit_user',
+        Strategy.P2P_CLUSTER,
+        onEndpointFound:
+            (String endpointId, String endpointName, String serviceId) {
+          _onP2PEndpointFound(endpointId, endpointName, serviceId);
+        },
+        onEndpointLost: (String? endpointId) {
+          if (endpointId != null) _onP2PEndpointLost(endpointId);
+        },
+      );
+      if (!started) throw ConnectionException('Failed to start P2P discovery');
+    } catch (e) {
+      throw ConnectionException('Failed to start P2P discovery: $e');
     }
   }
 
   Future<void> _startP2PAdvertising(String deviceName) async {
-    bool started = await Nearby().startAdvertising(
-      deviceName,
-      Strategy.P2P_CLUSTER,
-      onConnectionInitiated: _onP2PConnectionInitiated,
-      onConnectionResult: _onP2PConnectionResult,
-      onDisconnected: _onP2PDisconnected,
-    );
-
-    if (!started) {
-      throw ConnectionException('Failed to start P2P advertising');
+    try {
+      bool started = await Nearby().startAdvertising(
+        deviceName,
+        Strategy.P2P_CLUSTER,
+        onConnectionInitiated:
+            (String endpointId, ConnectionInfo connectionInfo) {
+          _onP2PConnectionInitiated(endpointId, connectionInfo);
+        },
+        onConnectionResult: (String endpointId, Status status) {
+          _onP2PConnectionResult(endpointId, status);
+        },
+        onDisconnected: (String endpointId) {
+          _onP2PDisconnected(endpointId);
+        },
+      );
+      if (!started) {
+        throw ConnectionException('Failed to start P2P advertising');
+      }
+    } catch (e) {
+      throw ConnectionException('Failed to start P2P advertising: $e');
     }
   }
 
   Future<bool> _connectP2P(DeviceModel device) async {
-    return await Nearby().requestConnection(
-      await _getDeviceInfo().then((info) => info.name),
-      device.id,
-      onConnectionInitiated: _onP2PConnectionInitiated,
-      onConnectionResult: _onP2PConnectionResult,
-      onDisconnected: _onP2PDisconnected,
-    );
+    try {
+      return await Nearby().requestConnection(
+        await _getDeviceInfo().then((info) => info.name),
+        device.id,
+        onConnectionInitiated:
+            (String endpointId, ConnectionInfo connectionInfo) {
+          _onP2PConnectionInitiated(endpointId, connectionInfo);
+        },
+        onConnectionResult: (String endpointId, Status status) {
+          _onP2PConnectionResult(endpointId, status);
+        },
+        onDisconnected: (String endpointId) {
+          _onP2PDisconnected(endpointId);
+        },
+      );
+    } catch (e) {
+      throw ConnectionException('Failed to connect P2P: $e');
+    }
   }
 
   void _onP2PEndpointFound(
@@ -434,7 +522,6 @@ class ConnectionService {
       capabilities: const NetworkCapability(supportsP2P: true),
       performance: const DevicePerformance(),
     );
-
     _discoveredDevices[endpointId] = device;
     _emitDevicesUpdate();
   }
@@ -446,11 +533,13 @@ class ConnectionService {
 
   void _onP2PConnectionInitiated(
       String endpointId, ConnectionInfo connectionInfo) {
-    // Handle connection request
-    _connectionController.add(ConnectionEvent.requestReceived(
-      _discoveredDevices[endpointId]!,
-      connectionInfo.authenticationToken,
-    ));
+    final device = _discoveredDevices[endpointId];
+    if (device != null) {
+      _connectionController.add(ConnectionEvent.requestReceived(
+        device,
+        connectionInfo.authenticationToken,
+      ));
+    }
   }
 
   void _onP2PConnectionResult(String endpointId, Status status) {
@@ -460,11 +549,6 @@ class ConnectionService {
     if (status == Status.CONNECTED) {
       _currentEndpointId = endpointId;
       _connectionController.add(ConnectionEvent.connected(device));
-
-      // Start listening for data
-      Nearby().startListeningForData(endpointId, (data) {
-        _dataController.add(DataReceivedEvent(endpointId, data));
-      });
     } else {
       _connectionController
           .add(ConnectionEvent.failed(device, status.toString()));
@@ -477,57 +561,307 @@ class ConnectionService {
   }
 
   Future<void> _startWiFiDiscovery(Duration timeout) async {
-    // Implement WiFi-based discovery (e.g., network scanning)
-    // This would involve scanning the local network for devices
-    // running the same app on specific ports
+    try {
+      final subscription =
+          _connectivity.onConnectivityChanged.listen((results) {
+        if (results.contains(ConnectivityResult.wifi)) {
+          _scanWiFiDevices();
+        }
+      });
+      _connectionSubscriptions['wifi_discovery'] = subscription;
+    } catch (e) {
+      throw ConnectionException('Failed to start WiFi discovery: $e');
+    }
+  }
+
+  Future<void> _scanWiFiDevices() async {
+    try {
+      final wifiIP = await _networkInfo.getWifiIP();
+      if (wifiIP == null) return;
+
+      final subnet = wifiIP.substring(0, wifiIP.lastIndexOf('.'));
+      for (int i = 1; i <= 255; i++) {
+        final ip = '$subnet.$i';
+        try {
+          final socket = await Socket.connect(ip, 8080,
+              timeout: Duration(milliseconds: 500));
+          final device = DeviceModel(
+            id: 'wifi_$ip',
+            name: 'WiFi Device $ip',
+            type: DeviceType.unknown,
+            model: 'Unknown',
+            manufacturer: 'Unknown',
+            osVersion: 'Unknown',
+            appVersion: 'Unknown',
+            ipAddress: ip,
+            port: 8080,
+            status: DeviceStatus.online,
+            lastSeen: DateTime.now(),
+            capabilities: const NetworkCapability(supportsWifi: true),
+            performance: const DevicePerformance(),
+          );
+          _discoveredDevices[device.id] = device;
+          socket.close();
+        } catch (_) {}
+      }
+      _emitDevicesUpdate();
+    } catch (e) {
+      throw ConnectionException('Failed to scan WiFi devices: $e');
+    }
   }
 
   Future<void> _startHotspotDiscovery(Duration timeout) async {
-    // Implement hotspot discovery
-    // Scan for available hotspots with specific naming pattern
-    final networks = await WiFiForIoTPlugin.loadWifiList();
-    // Process networks and add compatible devices
+    try {
+      final networks = await WiFiForIoTPlugin.loadWifiList();
+      for (var network in networks) {
+        if (network.ssid?.startsWith('ShareIt_') ?? false) {
+          final device = DeviceModel(
+            id: 'hotspot_${network.bssid}',
+            name: network.ssid ?? 'Unknown Hotspot',
+            type: DeviceType.unknown,
+            model: 'Unknown',
+            manufacturer: 'Unknown',
+            osVersion: 'Unknown',
+            appVersion: 'Unknown',
+            ipAddress: '',
+            port: 8080,
+            status: DeviceStatus.online,
+            lastSeen: DateTime.now(),
+            capabilities: const NetworkCapability(supportsHotspot: true),
+            performance: const DevicePerformance(),
+          );
+          _discoveredDevices[device.id] = device;
+        }
+      }
+      _emitDevicesUpdate();
+    } catch (e) {
+      throw ConnectionException('Failed to start hotspot discovery: $e');
+    }
   }
 
   Future<void> _startBluetoothDiscovery(Duration timeout) async {
-    // Implement Bluetooth discovery
-    // Would require additional Bluetooth packages
+    if (!Platform.isAndroid) {
+      throw ConnectionException(
+          'Bluetooth discovery not supported on this platform');
+    }
+    try {
+      final subscription = _bluetooth.startDiscovery().listen((result) {
+        final device = result.device;
+        final deviceModel = DeviceModel(
+          id: device.address,
+          name: device.name ?? 'Unknown Bluetooth Device',
+          type: DeviceType.unknown,
+          model: 'Unknown',
+          manufacturer: 'Unknown',
+          osVersion: 'Unknown',
+          appVersion: 'Unknown',
+          ipAddress: '',
+          port: 0,
+          status: DeviceStatus.online,
+          lastSeen: DateTime.now(),
+          capabilities: const NetworkCapability(supportsBluetooth: true),
+          performance: const DevicePerformance(),
+        );
+        _discoveredDevices[deviceModel.id] = deviceModel;
+        _emitDevicesUpdate();
+      });
+      _connectionSubscriptions['bluetooth_discovery'] = subscription;
+
+      Timer(timeout, () {
+        subscription.cancel();
+        _connectionSubscriptions.remove('bluetooth_discovery');
+        _bluetooth.cancelDiscovery();
+      });
+    } catch (e) {
+      throw ConnectionException('Failed to start Bluetooth discovery: $e');
+    }
   }
 
   Future<void> _startWiFiAdvertising(String deviceName) async {
-    // Start a server socket for WiFi connections
+    try {
+      _wifiServer = await ServerSocket.bind('0.0.0.0', 8080);
+      _connectionSubscriptions['wifi_server'] = _wifiServer!.listen((client) {
+        final device = DeviceModel(
+          id: 'wifi_${client.remoteAddress.address}',
+          name: deviceName,
+          type: DeviceType.unknown,
+          model: 'Unknown',
+          manufacturer: 'Unknown',
+          osVersion: 'Unknown',
+          appVersion: 'Unknown',
+          ipAddress: client.remoteAddress.address,
+          port: client.remotePort,
+          status: DeviceStatus.online,
+          lastSeen: DateTime.now(),
+          capabilities: const NetworkCapability(supportsWifi: true),
+          performance: const DevicePerformance(),
+        );
+        _discoveredDevices[device.id] = device;
+        _connectionSubscriptions['wifi_${device.id}'] = client.listen(
+          (data) {
+            _dataController.add(DataReceivedEvent(device.id, data));
+          },
+          onError: (e) {
+            _connectionController
+                .add(ConnectionEvent.failed(device, 'WiFi error: $e'));
+          },
+          onDone: () {
+            _connectionController.add(ConnectionEvent.disconnected());
+          },
+        );
+        _emitDevicesUpdate();
+      });
+    } catch (e) {
+      throw ConnectionException('Failed to start WiFi advertising: $e');
+    }
   }
 
   Future<void> _startHotspotAdvertising(String deviceName) async {
-    // Create a hotspot with the device name
-    await createHotspot(
-      ssid: 'ShareIt_$deviceName',
-      password: 'shareit123',
-    );
+    try {
+      await createHotspot(ssid: 'ShareIt_$deviceName', password: 'shareit123');
+      await _startWiFiAdvertising(deviceName);
+    } catch (e) {
+      throw ConnectionException('Failed to start hotspot advertising: $e');
+    }
   }
 
   Future<void> _startBluetoothAdvertising(String deviceName) async {
-    // Implement Bluetooth advertising
+    if (!Platform.isAndroid) {
+      throw ConnectionException(
+          'Bluetooth advertising not supported on this platform');
+    }
+    try {
+      // Request discoverability (timeout in seconds)
+      await _bluetooth.requestDiscoverable(120);
+
+      // Listen for state changes to detect incoming connections
+      final subscription = _bluetooth.onStateChanged().listen((state) async {
+        if (state.isEnabled) {
+          // Simulate server by checking paired devices and accepting connections
+          final bondedDevices = await _bluetooth.getBondedDevices();
+          for (var device in bondedDevices) {
+            try {
+              final connection =
+                  await BluetoothConnection.toAddress(device.address);
+              final deviceModel = DeviceModel(
+                id: 'bt_${device.address}',
+                name: device.name ?? deviceName,
+                type: DeviceType.unknown,
+                model: 'Unknown',
+                manufacturer: 'Unknown',
+                osVersion: 'Unknown',
+                appVersion: 'Unknown',
+                ipAddress: '',
+                port: 0,
+                status: DeviceStatus.online,
+                lastSeen: DateTime.now(),
+                capabilities: const NetworkCapability(supportsBluetooth: true),
+                performance: const DevicePerformance(),
+              );
+              _discoveredDevices[deviceModel.id] = deviceModel;
+              _bluetoothConnections[deviceModel.id] = connection;
+              connection.input!.listen(
+                (data) {
+                  _dataController.add(DataReceivedEvent(deviceModel.id, data));
+                },
+                onDone: () {
+                  _connectionController.add(ConnectionEvent.disconnected());
+                  _bluetoothConnections.remove(deviceModel.id);
+                },
+                onError: (e) {
+                  _connectionController.add(
+                    ConnectionEvent.failed(deviceModel, 'Bluetooth error: $e'),
+                  );
+                },
+              );
+              _emitDevicesUpdate();
+            } catch (e) {
+              // Ignore failed connections to individual devices
+            }
+          }
+        }
+      });
+
+      _connectionSubscriptions['bluetooth_server'] = subscription;
+    } catch (e) {
+      throw ConnectionException('Failed to start Bluetooth advertising: $e');
+    }
   }
 
   Future<bool> _connectWiFi(DeviceModel device) async {
-    // Implement WiFi connection
-    return false;
+    try {
+      final socket = await Socket.connect(device.ipAddress, device.port);
+      _connectionSubscriptions['wifi_${device.id}'] = socket.listen(
+        (data) {
+          _dataController.add(DataReceivedEvent(device.id, data));
+        },
+        onError: (e) {
+          _connectionController
+              .add(ConnectionEvent.failed(device, 'WiFi connection error: $e'));
+        },
+        onDone: () {
+          _connectionController.add(ConnectionEvent.disconnected());
+        },
+      );
+      return true;
+    } catch (e) {
+      throw ConnectionException('Failed to connect to WiFi device: $e');
+    }
   }
 
   Future<bool> _connectHotspot(DeviceModel device) async {
-    // Implement hotspot connection
-    return false;
+    try {
+      final connected = await WiFiForIoTPlugin.connect(
+        device.name,
+        password: 'shareit123',
+        security: NetworkSecurity.WPA,
+      );
+      if (connected) {
+        _currentEndpointId = device.id;
+        await _connectWiFi(device);
+        return true;
+      }
+      return false;
+    } catch (e) {
+      throw ConnectionException('Failed to connect to hotspot: $e');
+    }
   }
 
   Future<bool> _connectBluetooth(DeviceModel device) async {
-    // Implement Bluetooth connection
-    return false;
+    if (!Platform.isAndroid) {
+      throw ConnectionException(
+          'Bluetooth connection not supported on this platform');
+    }
+    try {
+      final connection = await BluetoothConnection.toAddress(device.id);
+      _bluetoothConnections[device.id] = connection;
+      _connectionSubscriptions['bluetooth_${device.id}'] =
+          connection.input!.listen(
+        (data) {
+          _dataController.add(DataReceivedEvent(device.id, data));
+        },
+        onDone: () {
+          _connectionController.add(ConnectionEvent.disconnected());
+          _bluetoothConnections.remove(device.id);
+        },
+      );
+      return true;
+    } catch (e) {
+      throw ConnectionException('Failed to connect to Bluetooth device: $e');
+    }
   }
 
-  Future<bool> _sendDataOverNetwork(Uint8List data) async {
-    // Implement network-based data sending
-    return false;
+  Future<bool> _sendDataOverNetwork(Uint8List data, String endpointId) async {
+    try {
+      final socket =
+          await Socket.connect(_discoveredDevices[endpointId]!.ipAddress, 8080);
+      socket.add(data);
+      await socket.flush();
+      socket.close();
+      return true;
+    } catch (e) {
+      throw ConnectionException('Failed to send data over network: $e');
+    }
   }
 
   Future<DeviceModel> _getDeviceInfo() async {
@@ -588,9 +922,11 @@ class ConnectionService {
   }
 
   void _onConnectivityChanged(List<ConnectivityResult> results) {
-    // Handle connectivity changes
     final result = results.first;
-    // Update device capabilities based on connectivity
+    if (result == ConnectivityResult.none) {
+      _connectionController.add(ConnectionEvent.disconnected());
+    }
+    _emitDevicesUpdate();
   }
 
   ConnectionType _mapConnectivityResult(ConnectivityResult result) {
@@ -630,16 +966,12 @@ class ConnectionEvent {
 
   factory ConnectionEvent.connecting(DeviceModel device) =>
       ConnectionEvent._(ConnectionEventType.connecting, device, null, null);
-
   factory ConnectionEvent.connected(DeviceModel device) =>
       ConnectionEvent._(ConnectionEventType.connected, device, null, null);
-
   factory ConnectionEvent.disconnected() =>
       ConnectionEvent._(ConnectionEventType.disconnected, null, null, null);
-
   factory ConnectionEvent.failed(DeviceModel device, String message) =>
       ConnectionEvent._(ConnectionEventType.failed, device, message, null);
-
   factory ConnectionEvent.requestReceived(
           DeviceModel device, String authDigits) =>
       ConnectionEvent._(
@@ -682,9 +1014,9 @@ class NetworkInformation {
 }
 
 class ConnectionSpeed {
-  final double uploadSpeed; // bytes per second
-  final double downloadSpeed; // bytes per second
-  final double latency; // milliseconds
+  final double uploadSpeed;
+  final double downloadSpeed;
+  final double latency;
   final String quality;
 
   ConnectionSpeed({

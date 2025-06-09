@@ -26,7 +26,7 @@ class FileModelAdapter extends TypeAdapter<FileModel> {
       dateCreated: fields[6] as DateTime,
       dateModified: fields[7] as DateTime,
       isDirectory: fields[8] as bool,
-      fileType: fields[9] as FileType,
+      fileType: fields[9] as AppFileType,
       thumbnailPath: fields[10] as String?,
       metadata: (fields[11] as Map).cast<String, dynamic>(),
       isSelected: fields[12] as bool,
@@ -82,70 +82,6 @@ class FileModelAdapter extends TypeAdapter<FileModel> {
           typeId == other.typeId;
 }
 
-class FileTypeAdapter extends TypeAdapter<FileType> {
-  @override
-  final int typeId = 0;
-
-  @override
-  FileType read(BinaryReader reader) {
-    switch (reader.readByte()) {
-      case 0:
-        return FileType.image;
-      case 1:
-        return FileType.video;
-      case 2:
-        return FileType.audio;
-      case 3:
-        return FileType.document;
-      case 4:
-        return FileType.archive;
-      case 5:
-        return FileType.application;
-      case 6:
-        return FileType.other;
-      default:
-        return FileType.image;
-    }
-  }
-
-  @override
-  void write(BinaryWriter writer, FileType obj) {
-    switch (obj) {
-      case FileType.image:
-        writer.writeByte(0);
-        break;
-      case FileType.video:
-        writer.writeByte(1);
-        break;
-      case FileType.audio:
-        writer.writeByte(2);
-        break;
-      case FileType.document:
-        writer.writeByte(3);
-        break;
-      case FileType.archive:
-        writer.writeByte(4);
-        break;
-      case FileType.application:
-        writer.writeByte(5);
-        break;
-      case FileType.other:
-        writer.writeByte(6);
-        break;
-    }
-  }
-
-  @override
-  int get hashCode => typeId.hashCode;
-
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is FileTypeAdapter &&
-          runtimeType == other.runtimeType &&
-          typeId == other.typeId;
-}
-
 // **************************************************************************
 // JsonSerializableGenerator
 // **************************************************************************
@@ -161,7 +97,7 @@ _$FileModelImpl _$$FileModelImplFromJson(Map<String, dynamic> json) =>
       dateCreated: DateTime.parse(json['dateCreated'] as String),
       dateModified: DateTime.parse(json['dateModified'] as String),
       isDirectory: json['isDirectory'] as bool? ?? false,
-      fileType: $enumDecode(_$FileTypeEnumMap, json['fileType']),
+      fileType: $enumDecode(_$AppFileTypeEnumMap, json['fileType']),
       thumbnailPath: json['thumbnailPath'] as String?,
       metadata: json['metadata'] as Map<String, dynamic>? ?? const {},
       isSelected: json['isSelected'] as bool? ?? false,
@@ -180,7 +116,7 @@ Map<String, dynamic> _$$FileModelImplToJson(_$FileModelImpl instance) =>
       'dateCreated': instance.dateCreated.toIso8601String(),
       'dateModified': instance.dateModified.toIso8601String(),
       'isDirectory': instance.isDirectory,
-      'fileType': _$FileTypeEnumMap[instance.fileType]!,
+      'fileType': _$AppFileTypeEnumMap[instance.fileType]!,
       'thumbnailPath': instance.thumbnailPath,
       'metadata': instance.metadata,
       'isSelected': instance.isSelected,
@@ -188,14 +124,14 @@ Map<String, dynamic> _$$FileModelImplToJson(_$FileModelImpl instance) =>
       'childCount': instance.childCount,
     };
 
-const _$FileTypeEnumMap = {
-  FileType.image: 'image',
-  FileType.video: 'video',
-  FileType.audio: 'audio',
-  FileType.document: 'document',
-  FileType.archive: 'archive',
-  FileType.application: 'application',
-  FileType.other: 'other',
+const _$AppFileTypeEnumMap = {
+  AppFileType.image: 'image',
+  AppFileType.video: 'video',
+  AppFileType.audio: 'audio',
+  AppFileType.document: 'document',
+  AppFileType.archive: 'archive',
+  AppFileType.application: 'application',
+  AppFileType.other: 'other',
 };
 
 _$FileListImpl _$$FileListImplFromJson(Map<String, dynamic> json) =>

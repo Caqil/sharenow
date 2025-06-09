@@ -39,7 +39,7 @@ mixin _$FileModel {
   @HiveField(8)
   bool get isDirectory => throw _privateConstructorUsedError;
   @HiveField(9)
-  FileType get fileType => throw _privateConstructorUsedError;
+  AppFileType get fileType => throw _privateConstructorUsedError;
   @HiveField(10)
   String? get thumbnailPath => throw _privateConstructorUsedError;
   @HiveField(11)
@@ -76,7 +76,7 @@ abstract class $FileModelCopyWith<$Res> {
       @HiveField(6) DateTime dateCreated,
       @HiveField(7) DateTime dateModified,
       @HiveField(8) bool isDirectory,
-      @HiveField(9) FileType fileType,
+      @HiveField(9) AppFileType fileType,
       @HiveField(10) String? thumbnailPath,
       @HiveField(11) Map<String, dynamic> metadata,
       @HiveField(12) bool isSelected,
@@ -155,7 +155,7 @@ class _$FileModelCopyWithImpl<$Res, $Val extends FileModel>
       fileType: null == fileType
           ? _value.fileType
           : fileType // ignore: cast_nullable_to_non_nullable
-              as FileType,
+              as AppFileType,
       thumbnailPath: freezed == thumbnailPath
           ? _value.thumbnailPath
           : thumbnailPath // ignore: cast_nullable_to_non_nullable
@@ -198,7 +198,7 @@ abstract class _$$FileModelImplCopyWith<$Res>
       @HiveField(6) DateTime dateCreated,
       @HiveField(7) DateTime dateModified,
       @HiveField(8) bool isDirectory,
-      @HiveField(9) FileType fileType,
+      @HiveField(9) AppFileType fileType,
       @HiveField(10) String? thumbnailPath,
       @HiveField(11) Map<String, dynamic> metadata,
       @HiveField(12) bool isSelected,
@@ -275,7 +275,7 @@ class __$$FileModelImplCopyWithImpl<$Res>
       fileType: null == fileType
           ? _value.fileType
           : fileType // ignore: cast_nullable_to_non_nullable
-              as FileType,
+              as AppFileType,
       thumbnailPath: freezed == thumbnailPath
           ? _value.thumbnailPath
           : thumbnailPath // ignore: cast_nullable_to_non_nullable
@@ -354,7 +354,7 @@ class _$FileModelImpl implements _FileModel {
   final bool isDirectory;
   @override
   @HiveField(9)
-  final FileType fileType;
+  final AppFileType fileType;
   @override
   @HiveField(10)
   final String? thumbnailPath;
@@ -464,7 +464,7 @@ abstract class _FileModel implements FileModel {
       @HiveField(6) required final DateTime dateCreated,
       @HiveField(7) required final DateTime dateModified,
       @HiveField(8) final bool isDirectory,
-      @HiveField(9) required final FileType fileType,
+      @HiveField(9) required final AppFileType fileType,
       @HiveField(10) final String? thumbnailPath,
       @HiveField(11) final Map<String, dynamic> metadata,
       @HiveField(12) final bool isSelected,
@@ -503,7 +503,7 @@ abstract class _FileModel implements FileModel {
   bool get isDirectory;
   @override
   @HiveField(9)
-  FileType get fileType;
+  AppFileType get fileType;
   @override
   @HiveField(10)
   String? get thumbnailPath;

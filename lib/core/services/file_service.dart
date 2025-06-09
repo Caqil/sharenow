@@ -576,7 +576,7 @@ class FileService {
     return type.pickerFileType;
   }
 
-  FileChangeType _mapFileSystemEventType(FileSystemEvent type) {
+  FileChangeType _mapFileSystemEventType(int type) {
     if (type == FileSystemEvent.create) return FileChangeType.created;
     if (type == FileSystemEvent.modify) return FileChangeType.modified;
     if (type == FileSystemEvent.delete) return FileChangeType.deleted;

@@ -327,9 +327,13 @@ class StorageService {
       settings['compression_enabled'] = getCompressionEnabled();
       settings['notifications_enabled'] = getNotificationsEnabled();
 
-      // Get from Hive settings box
+      // Get from Hive settings box and convert to Map<String, dynamic>
       final hiveSettings = _settingsBox_.toMap();
-      settings.addAll(hiveSettings);
+      for (final entry in hiveSettings.entries) {
+        if (entry.key is String) {
+          settings[entry.key as String] = entry.value;
+        }
+      }
 
       return settings;
     } catch (e) {
