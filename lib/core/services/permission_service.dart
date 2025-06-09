@@ -66,23 +66,16 @@ class PermissionService {
   }
 
   /// Get list of required permissions based on platform
+  /// Get list of required permissions based on platform
   Future<List<Permission>> getRequiredPermissions() async {
     final permissions = <Permission>[];
 
     if (Platform.isAndroid) {
-      // Android permissions
+      // Android permissions that require runtime requests
       permissions.addAll([
         Permission.storage,
-        Permission.manageExternalStorage,
         Permission.location,
         Permission.locationWhenInUse,
-        Permission.nearbyWifiDevices,
-        Permission.bluetoothConnect,
-        Permission.bluetoothAdvertise,
-        Permission.bluetoothScan,
-        Permission.nearbyWifiDevices,
-        Permission.changeWifiState,
-        Permission.accessNetworkState,
         Permission.camera,
         Permission.microphone,
         Permission.notification,
@@ -91,17 +84,35 @@ class PermissionService {
       // Check Android version for specific permissions
       final androidInfo = await _getAndroidInfo();
       if (androidInfo != null) {
+        // Android 12+ (API 31+) - Bluetooth permissions
+        if (androidInfo.version.sdkInt >= 31) {
+          permissions.addAll([
+            Permission.bluetoothConnect,
+            Permission.bluetoothAdvertise,
+            Permission.bluetoothScan,
+          ]);
+        } else {
+          // Older Android versions use general Bluetooth permission
+          permissions.add(Permission.bluetooth);
+        }
+
+        // Android 13+ (API 33+) - Granular media permissions
         if (androidInfo.version.sdkInt >= 33) {
-          // Android 13+ specific permissions
           permissions.addAll([
             Permission.photos,
             Permission.videos,
             Permission.audio,
           ]);
         }
+
+        // Android 11+ (API 30+) - Manage external storage
         if (androidInfo.version.sdkInt >= 30) {
-          // Android 11+ specific permissions
           permissions.add(Permission.manageExternalStorage);
+        }
+
+        // Android 13+ (API 33+) - Nearby WiFi devices
+        if (androidInfo.version.sdkInt >= 33) {
+          permissions.add(Permission.nearbyWifiDevices);
         }
       }
     } else if (Platform.isIOS) {

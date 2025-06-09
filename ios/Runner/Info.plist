@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>Sharenow</string>
+	<string>ShareNow</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -13,7 +13,7 @@
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>sharenow</string>
+	<string>ShareNow</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
@@ -24,16 +24,34 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	
+	<!-- Essential Permissions Only -->
+	
+	<!-- Photo Library Access for file sharing -->
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Access photos and videos to share with nearby devices</string>
+	
+	<!-- Camera for QR code scanning -->
+	<key>NSCameraUsageDescription</key>
+	<string>Scan QR codes to quickly connect with nearby devices</string>
+	
+	<!-- Location for device discovery -->
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Find nearby devices for file sharing</string>
+	
+	<!-- Bluetooth for device connection -->
 	<key>NSBluetoothAlwaysUsageDescription</key>
-<string>Need Bluetooth access for device discovery and connection</string>
-<key>NSLocalNetworkUsageDescription</key>
-<string>Need local network access for WiFi and hotspot connections</string>
-<key>NSLocationWhenInUseUsageDescription</key>
-<string>Need location access for WiFi and Bluetooth discovery</string>
+	<string>Connect to nearby devices for file sharing</string>
+	
+	<!-- Local Network for WiFi direct transfers -->
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Connect to devices on local network for fast file transfers</string>
+	
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIMainStoryboardFile</key>
 	<string>Main</string>
+	
 	<key>UISupportedInterfaceOrientations</key>
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>
@@ -47,9 +65,17 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	
+	<!-- Allow local network connections -->
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
+	</dict>
 </dict>
 </plist>
