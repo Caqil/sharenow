@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:convert';
 
 import 'package:injectable/injectable.dart';
 import 'package:hive_flutter/hive_flutter.dart';
@@ -8,7 +7,6 @@ import 'package:path_provider/path_provider.dart';
 
 import '../models/transfer_model.dart';
 import '../models/device_model.dart';
-import '../models/file_model.dart';
 
 /// Service for managing local storage using Hive and SharedPreferences
 @lazySingleton
@@ -179,6 +177,76 @@ class StorageService {
       _emitTransferHistoryUpdate();
     } catch (e) {
       throw StorageServiceException('Failed to clear transfer history: $e');
+    }
+  }
+
+  /// Get recent transfers (convenience method)
+  Future<List<dynamic>> getRecentTransfers({int limit = 5}) async {
+    _ensureInitialized();
+
+    try {
+      final transfers = await getTransferHistory(limit: limit);
+
+      // Convert to Map format for compatibility with widgets
+      return transfers
+          .map((transfer) => {
+                'id': transfer.id,
+                'fileName': transfer.files.isNotEmpty
+                    ? transfer.files.first.name
+                    : 'Unknown File',
+                'fileType': transfer.files.isNotEmpty
+                    ? transfer.files.first.fileType.toString().split('.').last
+                    : 'unknown',
+                'filePath': transfer.files.isNotEmpty
+                    ? transfer.files.first.path
+                    : '',
+                'fileCount': transfer.files.length,
+                'fileSizeFormatted': transfer.totalSize > 0
+                    ? '${(transfer.totalSize / (1024 * 1024)).toStringAsFixed(2)} MB'
+                    : '0 MB',
+                'fileSizeBytes': transfer.totalSize,
+                'fileSize': transfer.totalSize,
+                'status': transfer.status.toString().split('.').last,
+                'timestamp': transfer.createdAt,
+                'deviceName': transfer.remoteDevice,
+                'direction': transfer.direction.toString().split('.').last,
+                'isIncoming': transfer.direction.toString().contains('receive'),
+                'createdAt': transfer.createdAt,
+                'progress': transfer.progress.percentage,
+              })
+          .toList();
+    } catch (e) {
+      // Return empty list on error instead of throwing
+      return [];
+    }
+  }
+
+  /// Get transfer statistics as Map (for UI compatibility)
+  Future<Map<String, dynamic>> getTransferStatisticsMap() async {
+    _ensureInitialized();
+
+    try {
+      final stats = await getTransferStatistics();
+
+      return {
+        'totalTransfers': stats.totalTransfers,
+        'successfulTransfers': stats.successfulTransfers,
+        'failedTransfers': stats.failedTransfers,
+        'totalBytes': stats.totalBytesTransferred,
+        'averageSpeed': stats.averageTransferSize,
+        'successRate': stats.successRate,
+        'failureRate': stats.failureRate,
+      };
+    } catch (e) {
+      return {
+        'totalTransfers': 0,
+        'successfulTransfers': 0,
+        'failedTransfers': 0,
+        'totalBytes': 0,
+        'averageSpeed': 0.0,
+        'successRate': 0.0,
+        'failureRate': 0.0,
+      };
     }
   }
 

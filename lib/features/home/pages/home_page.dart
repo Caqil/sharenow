@@ -1,732 +1,405 @@
-// lib/features/home/pages/home_page.dart
-
 import 'package:flutter/material.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:shadcn_ui/shadcn_ui.dart';
-import 'package:flutter_animate/flutter_animate.dart';
+import 'package:flutter/services.dart';
+import 'package:get_it/get_it.dart';
 
-import '../../../core/models/device_model.dart';
-import '../../../core/models/transfer_model.dart';
-import '../../../core/constants/connection_types.dart';
-import '../../../shared/widgets/app_progress.dart';
-import '../../../shared/widgets/error_widget.dart';
-import '../../../shared/widgets/loading_widget.dart';
-import '../bloc/home_bloc.dart';
-import '../bloc/home_event.dart';
-import '../bloc/home_state.dart';
+import '../../../core/constants/app_constants.dart';
+import '../../../core/utils/extensions.dart';
+import '../../../core/services/storage_service.dart';
+import '../../../shared/widgets/app_button.dart';
 import '../widgets/stats_card.dart';
-import '../widgets/recent_transfers.dart';
 import '../widgets/quick_actions.dart';
+import '../widgets/recent_transfers.dart';
 
-class HomePage extends StatelessWidget {
-  const HomePage({Key? key}) : super(key: key);
+/// Home page of the ShareNow application
+///
+/// Displays main dashboard with transfer statistics, quick actions,
+/// and recent transfer history with consistent Material 3 theming
+class HomePage extends StatefulWidget {
+  const HomePage({super.key});
+
+  @override
+  State<HomePage> createState() => _HomePageState();
+}
+
+class _HomePageState extends State<HomePage>
+    with AutomaticKeepAliveClientMixin, TickerProviderStateMixin {
+  late final StorageService _storageService;
+  late final AnimationController _animationController;
+  late final Animation<double> _fadeAnimation;
+  late final Animation<Offset> _slideAnimation;
+
+  bool _isLoading = true;
+  Map<String, dynamic> _transferStats = {};
+  List<dynamic> _recentTransfers = [];
+  String _userName = '';
+
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
+  void initState() {
+    super.initState();
+    _initializeServices();
+    _setupAnimations();
+    _loadData();
+  }
+
+  @override
+  void dispose() {
+    _animationController.dispose();
+    super.dispose();
+  }
+
+  void _initializeServices() {
+    _storageService = GetIt.instance<StorageService>();
+  }
+
+  void _setupAnimations() {
+    _animationController = AnimationController(
+      duration: Duration(milliseconds: AppConstants.mediumAnimationDuration),
+      vsync: this,
+    );
+
+    _fadeAnimation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(
+      parent: _animationController,
+      curve: Curves.easeInOut,
+    ));
+
+    _slideAnimation = Tween<Offset>(
+      begin: const Offset(0, 0.1),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(
+      parent: _animationController,
+      curve: Curves.easeOutCubic,
+    ));
+  }
+
+  Future<void> _loadData() async {
+    try {
+      // Load user data and statistics
+      final futures = await Future.wait([
+        _storageService.getTransferStatisticsMap(),
+        _storageService.getRecentTransfers(limit: 5),
+      ]);
+
+      if (mounted) {
+        setState(() {
+          _userName = _storageService.getUserName() ?? 'User';
+          _transferStats = futures[0] as Map<String, dynamic>? ?? {};
+          _recentTransfers = futures[1] as List<dynamic>? ?? [];
+          _isLoading = false;
+        });
+        _animationController.forward();
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        context.showErrorSnackBar('Failed to load data');
+      }
+    }
+  }
+
+  Future<void> _refreshData() async {
+    HapticFeedback.lightImpact();
+    await _loadData();
+  }
 
   @override
   Widget build(BuildContext context) {
-    return BlocConsumer<HomeBloc, HomeState>(
-      listener: (context, state) {
-        // Show error messages
-        if (state.errorMessage != null) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(state.errorMessage!),
-              backgroundColor: Colors.red,
-              behavior: SnackBarBehavior.floating,
-              action: SnackBarAction(
-                label: 'Dismiss',
-                textColor: Colors.white,
-                onPressed: () {
-                  context.read<HomeBloc>().add(const HomeClearMessagesEvent());
-                },
-              ),
-            ),
-          );
-        }
+    super.build(context);
 
-        // Show success messages
-        if (state.successMessage != null) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(state.successMessage!),
-              backgroundColor: Colors.green,
-              behavior: SnackBarBehavior.floating,
-              action: SnackBarAction(
-                label: 'Dismiss',
-                textColor: Colors.white,
-                onPressed: () {
-                  context.read<HomeBloc>().add(const HomeClearMessagesEvent());
-                },
+    if (_isLoading) {
+      return _buildLoadingState();
+    }
+
+    return RefreshIndicator(
+      onRefresh: _refreshData,
+      child: CustomScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        slivers: [
+          _buildAppBar(),
+          SliverToBoxAdapter(
+            child: FadeTransition(
+              opacity: _fadeAnimation,
+              child: SlideTransition(
+                position: _slideAnimation,
+                child: Padding(
+                  padding: EdgeInsets.all(AppConstants.defaultPadding),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildWelcomeSection(),
+                      SizedBox(height: AppConstants.sectionSpacing),
+                      _buildStatsSection(),
+                      SizedBox(height: AppConstants.sectionSpacing),
+                      _buildQuickActions(),
+                      SizedBox(height: AppConstants.sectionSpacing),
+                      _buildRecentTransfers(),
+                      SizedBox(height: context.mediaQuery.padding.bottom),
+                    ],
+                  ),
+                ),
               ),
-            ),
-          );
-        }
-      },
-      builder: (context, state) {
-        return Scaffold(
-          backgroundColor: ShadTheme.of(context).colorScheme.background,
-          body: RefreshIndicator(
-            onRefresh: () async {
-              context.read<HomeBloc>().add(const HomeRefreshEvent());
-            },
-            child: CustomScrollView(
-              slivers: [
-                _buildAppBar(context, state),
-                _buildBody(context, state),
-              ],
             ),
           ),
-          floatingActionButton: _buildFloatingActionButton(context, state),
-        );
-      },
+        ],
+      ),
     );
   }
 
-  Widget _buildAppBar(BuildContext context, HomeState state) {
-    final theme = ShadTheme.of(context);
+  Widget _buildLoadingState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          CircularProgressIndicator(
+            color: context.colorScheme.primary,
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'Loading your dashboard...',
+            style: context.textTheme.bodyMedium?.copyWith(
+              color: context.colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
+  Widget _buildAppBar() {
     return SliverAppBar(
       expandedHeight: 120,
-      floating: true,
-      snap: true,
-      backgroundColor: theme.colorScheme.background,
-      foregroundColor: theme.colorScheme.foreground,
+      floating: false,
+      pinned: true,
+      backgroundColor: context.colorScheme.surface,
+      surfaceTintColor: Colors.transparent,
       elevation: 0,
       flexibleSpace: FlexibleSpaceBar(
+        titlePadding: EdgeInsets.only(
+          left: AppConstants.defaultPadding,
+          bottom: 16,
+        ),
+        title: Text(
+          'ShareNow',
+          style: context.textTheme.headlineSmall?.copyWith(
+            color: context.colorScheme.onSurface,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
         background: Container(
-          padding: const EdgeInsets.fromLTRB(16, 60, 16, 16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: theme.colorScheme.primary,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Icon(
-                      Icons.share,
-                      color: theme.colorScheme.primaryForeground,
-                      size: 24,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'ShareIt Pro',
-                          style: theme.textTheme.headlineSmall?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        Text(
-                          state.connectionStatusText,
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.colorScheme.mutedForeground,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  _buildStatusIndicator(context, state),
-                ],
-              ),
-            ],
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                context.colorScheme.primaryContainer.withOpacity(0.1),
+                context.colorScheme.surface,
+              ],
+            ),
           ),
         ),
       ),
       actions: [
         IconButton(
-          icon: const Icon(Icons.settings),
           onPressed: () {
             // Navigate to settings
+            HapticFeedback.lightImpact();
           },
+          icon: Icon(
+            Icons.settings_outlined,
+            color: context.colorScheme.onSurface,
+          ),
+          tooltip: 'Settings',
         ),
-        if (state.isDiscovering || state.isAdvertising)
-          IconButton(
-            icon: const Icon(Icons.stop),
-            onPressed: () {
-              if (state.isDiscovering) {
-                context.read<HomeBloc>().add(const HomeStopDiscoveryEvent());
-              } else if (state.isAdvertising) {
-                context.read<HomeBloc>().add(const HomeStopAdvertisingEvent());
-              }
-            },
-          ).animate().pulse(duration: 1000.ms).then().pulse(),
+        const SizedBox(width: 8),
       ],
     );
   }
 
-  Widget _buildStatusIndicator(BuildContext context, HomeState state) {
-    final theme = ShadTheme.of(context);
+  Widget _buildWelcomeSection() {
+    final hour = DateTime.now().hour;
+    String greeting;
 
-    Color statusColor;
-    IconData statusIcon;
-
-    if (state.connectedDevice != null) {
-      statusColor = Colors.green;
-      statusIcon = Icons.link;
-    } else if (state.isDiscovering || state.isAdvertising) {
-      statusColor = Colors.orange;
-      statusIcon = Icons.radar;
-    } else if (!state.hasAllPermissions) {
-      statusColor = Colors.red;
-      statusIcon = Icons.warning;
-    } else if (!state.isNetworkConnected) {
-      statusColor = Colors.red;
-      statusIcon = Icons.wifi_off;
+    if (hour < 12) {
+      greeting = 'Good morning';
+    } else if (hour < 17) {
+      greeting = 'Good afternoon';
     } else {
-      statusColor = Colors.grey;
-      statusIcon = Icons.circle;
+      greeting = 'Good evening';
     }
 
     return Container(
-      padding: const EdgeInsets.all(8),
+      width: double.infinity,
+      padding: EdgeInsets.all(AppConstants.defaultPadding),
       decoration: BoxDecoration(
-        color: statusColor.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: statusColor.withOpacity(0.3)),
-      ),
-      child: Icon(
-        statusIcon,
-        color: statusColor,
-        size: 16,
-      ),
-    ).animate().fadeIn().scale();
-  }
-
-  Widget _buildBody(BuildContext context, HomeState state) {
-    if (state.status == HomeStatus.loading) {
-      return const SliverFillRemaining(
-        child: LoadingWidget(message: 'Initializing ShareIt Pro...'),
-      );
-    }
-
-    if (state.status == HomeStatus.error && state.status != HomeStatus.loaded) {
-      return SliverFillRemaining(
-        child: CustomErrorWidget(
-          message: state.errorMessage ?? 'An error occurred',
-          onRetry: () {
-            context.read<HomeBloc>().add(const HomeInitializeEvent());
-          },
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            context.colorScheme.primaryContainer,
+            context.colorScheme.primaryContainer.withOpacity(0.7),
+          ],
         ),
-      );
-    }
-
-    return SliverPadding(
-      padding: const EdgeInsets.all(16),
-      sliver: SliverList(
-        delegate: SliverChildListDelegate([
-          // Permissions check
-          if (!state.hasAllPermissions) ...[
-            _buildPermissionsCard(context, state),
-            const SizedBox(height: 16),
-          ],
-
-          // Quick actions
-          QuickActionsWidget(
-            onDiscoverDevices: () {
-              context.read<HomeBloc>().add(const HomeStartDiscoveryEvent());
-            },
-            onStartAdvertising: () {
-              context.read<HomeBloc>().add(const HomeStartAdvertisingEvent());
-            },
-            onSendFiles: () {
-              // Navigate to file picker
-            },
-            onReceiveFiles: () {
-              context.read<HomeBloc>().add(const HomeStartAdvertisingEvent());
-            },
-            isDiscovering: state.isDiscovering,
-            isAdvertising: state.isAdvertising,
-            connectedDevice: state.connectedDevice,
-          ).animate().fadeIn(delay: 100.ms).slideY(begin: 0.1),
-
-          const SizedBox(height: 24),
-
-          // Stats cards
-          StatsCard(
-            totalTransfers: state.quickStats['totalTransfers'] ?? 0,
-            successfulTransfers: state.quickStats['successfulTransfers'] ?? 0,
-            totalDataTransferred:
-                state.quickStats['totalDataTransferred'] ?? '0 B',
-            successRate: state.quickStats['successRate'] ?? 0.0,
-            devicesConnected: state.onlineDevicesCount,
-            activeTransfers: state.activeTransfers.length,
-          ).animate().fadeIn(delay: 200.ms).slideY(begin: 0.1),
-
-          const SizedBox(height: 24),
-
-          // Discovered devices
-          if (state.hasDiscoveredDevices) ...[
-            _buildSectionHeader(
-                context, 'Nearby Devices', state.discoveredDevices.length),
-            const SizedBox(height: 12),
-            _buildDevicesList(context, state),
-            const SizedBox(height: 24),
-          ],
-
-          // Active transfers
-          if (state.hasActiveTransfers) ...[
-            _buildSectionHeader(
-                context, 'Active Transfers', state.activeTransfers.length),
-            const SizedBox(height: 12),
-            _buildActiveTransfers(context, state),
-            const SizedBox(height: 24),
-          ],
-
-          // Recent transfers
-          if (state.recentTransfers.isNotEmpty) ...[
-            _buildSectionHeader(
-                context, 'Recent Transfers', state.recentTransfers.length),
-            const SizedBox(height: 12),
-            RecentTransfersWidget(
-              transfers: state.recentTransfers,
-              onTransferTap: (transfer) {
-                // Navigate to transfer details
-              },
-              onRetryTransfer: (transferId) {
-                context
-                    .read<HomeBloc>()
-                    .add(HomeRetryTransferEvent(transferId));
-              },
-            ).animate().fadeIn(delay: 300.ms).slideY(begin: 0.1),
-          ],
-
-          // Empty state
-          if (!state.hasDiscoveredDevices &&
-              !state.hasActiveTransfers &&
-              state.recentTransfers.isEmpty &&
-              state.hasAllPermissions) ...[
-            _buildEmptyState(context, state),
-          ],
-
-          // Add some bottom padding
-          const SizedBox(height: 100),
-        ]),
+        borderRadius: BorderRadius.circular(AppConstants.defaultBorderRadius),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '$greeting, $_userName! 👋',
+            style: context.textTheme.headlineSmall?.copyWith(
+              color: context.colorScheme.onPrimaryContainer,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Ready to share files with nearby devices?',
+            style: context.textTheme.bodyMedium?.copyWith(
+              color: context.colorScheme.onPrimaryContainer.withOpacity(0.8),
+            ),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _buildPermissionsCard(BuildContext context, HomeState state) {
-    final theme = ShadTheme.of(context);
+  Widget _buildStatsSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(
+              Icons.analytics_outlined,
+              color: context.colorScheme.primary,
+              size: 20,
+            ),
+            const SizedBox(width: 8),
+            Text(
+              'Your Statistics',
+              style: context.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w600,
+                color: context.colorScheme.onSurface,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        StatsCard(
+          transferStats: _transferStats,
+          onStatsUpdated: _refreshData,
+        ),
+      ],
+    );
+  }
 
-    return ShadCard(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+  Widget _buildQuickActions() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(
+              Icons.bolt_outlined,
+              color: context.colorScheme.primary,
+              size: 20,
+            ),
+            const SizedBox(width: 8),
+            Text(
+              'Quick Actions',
+              style: context.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w600,
+                color: context.colorScheme.onSurface,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        QuickActions(
+          onActionTapped: (actionType) {
+            HapticFeedback.lightImpact();
+            // Handle action navigation
+            _handleQuickAction(actionType);
+          },
+        ),
+      ],
+    );
+  }
+
+  Widget _buildRecentTransfers() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Row(
               children: [
                 Icon(
-                  Icons.warning,
-                  color: Colors.orange,
-                  size: 24,
+                  Icons.history,
+                  color: context.colorScheme.primary,
+                  size: 20,
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Permissions Required',
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.semibold,
-                        ),
-                      ),
-                      Text(
-                        'Grant permissions to enable file sharing',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.mutedForeground,
-                        ),
-                      ),
-                    ],
+                const SizedBox(width: 8),
+                Text(
+                  'Recent Transfers',
+                  style: context.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                    color: context.colorScheme.onSurface,
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 16),
-            SizedBox(
-              width: double.infinity,
-              child: ShadButton(
-                onPressed: state.status == HomeStatus.requestingPermissions
-                    ? null
-                    : () {
-                        context
-                            .read<HomeBloc>()
-                            .add(const HomeRequestPermissionsEvent());
-                      },
-                child: state.status == HomeStatus.requestingPermissions
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Text('Grant Permissions'),
+            if (_recentTransfers.isNotEmpty)
+              TextButton(
+                onPressed: () {
+                  HapticFeedback.lightImpact();
+                  // Navigate to full history
+                },
+                child: Text(
+                  'View All',
+                  style: TextStyle(
+                    color: context.colorScheme.primary,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
               ),
-            ),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildSectionHeader(BuildContext context, String title, int count) {
-    final theme = ShadTheme.of(context);
-
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(
-          title,
-          style: theme.textTheme.titleLarge?.copyWith(
-            fontWeight: FontWeight.semibold,
-          ),
-        ),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-          decoration: BoxDecoration(
-            color: theme.colorScheme.muted,
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Text(
-            count.toString(),
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.colorScheme.mutedForeground,
-              fontWeight: FontWeight.medium,
-            ),
-          ),
+        const SizedBox(height: 16),
+        RecentTransfers(
+          transfers: _recentTransfers,
+          onTransferTapped: (transfer) {
+            HapticFeedback.lightImpact();
+            // Navigate to transfer details
+          },
+          onRefresh: _refreshData,
         ),
       ],
     );
   }
 
-  Widget _buildDevicesList(BuildContext context, HomeState state) {
-    return Column(
-      children: state.discoveredDevices.map((device) {
-        return _buildDeviceCard(context, device, state);
-      }).toList(),
-    );
-  }
-
-  Widget _buildDeviceCard(
-      BuildContext context, DeviceModel device, HomeState state) {
-    final theme = ShadTheme.of(context);
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      child: ShadCard(
-        child: InkWell(
-          onTap: state.connectedDevice?.id == device.id
-              ? null
-              : () {
-                  context
-                      .read<HomeBloc>()
-                      .add(HomeConnectToDeviceEvent(device));
-                },
-          borderRadius: BorderRadius.circular(12),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              children: [
-                Container(
-                  width: 48,
-                  height: 48,
-                  decoration: BoxDecoration(
-                    color: device.type.isMobile
-                        ? Colors.blue.withOpacity(0.1)
-                        : Colors.grey.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Icon(
-                    device.type.isMobile ? Icons.smartphone : Icons.computer,
-                    color: device.type.isMobile ? Colors.blue : Colors.grey,
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        device.name,
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.semibold,
-                        ),
-                      ),
-                      Text(
-                        '${device.type.displayName} • ${device.ipAddress}',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.mutedForeground,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                if (state.connectedDevice?.id == device.id)
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: Colors.green.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Text(
-                      'Connected',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: Colors.green,
-                        fontWeight: FontWeight.medium,
-                      ),
-                    ),
-                  )
-                else
-                  Icon(
-                    Icons.arrow_forward_ios,
-                    size: 16,
-                    color: theme.colorScheme.mutedForeground,
-                  ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    ).animate().fadeIn().slideX(begin: 0.1);
-  }
-
-  Widget _buildActiveTransfers(BuildContext context, HomeState state) {
-    return Column(
-      children: state.activeTransfers.map((transfer) {
-        return _buildActiveTransferCard(context, transfer);
-      }).toList(),
-    );
-  }
-
-  Widget _buildActiveTransferCard(
-      BuildContext context, TransferModel transfer) {
-    final theme = ShadTheme.of(context);
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      child: ShadCard(
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Icon(
-                    transfer.direction == TransferDirection.send
-                        ? Icons.upload
-                        : Icons.download,
-                    color: transfer.direction == TransferDirection.send
-                        ? Colors.blue
-                        : Colors.green,
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          '${transfer.files.length} files to ${transfer.remoteDevice.name}',
-                          style: theme.textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.semibold,
-                          ),
-                        ),
-                        Text(
-                          transfer.formattedTotalSize,
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.colorScheme.mutedForeground,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  PopupMenuButton(
-                    itemBuilder: (context) => [
-                      if (transfer.status.canPause)
-                        PopupMenuItem(
-                          value: 'pause',
-                          child: const Row(
-                            children: [
-                              Icon(Icons.pause),
-                              SizedBox(width: 8),
-                              Text('Pause'),
-                            ],
-                          ),
-                        ),
-                      if (transfer.status.canResume)
-                        PopupMenuItem(
-                          value: 'resume',
-                          child: const Row(
-                            children: [
-                              Icon(Icons.play_arrow),
-                              SizedBox(width: 8),
-                              Text('Resume'),
-                            ],
-                          ),
-                        ),
-                      if (transfer.status.canCancel)
-                        PopupMenuItem(
-                          value: 'cancel',
-                          child: const Row(
-                            children: [
-                              Icon(Icons.cancel),
-                              SizedBox(width: 8),
-                              Text('Cancel'),
-                            ],
-                          ),
-                        ),
-                    ],
-                    onSelected: (value) {
-                      switch (value) {
-                        case 'pause':
-                        case 'resume':
-                          context
-                              .read<HomeBloc>()
-                              .add(HomeToggleTransferEvent(transfer.id));
-                          break;
-                        case 'cancel':
-                          context
-                              .read<HomeBloc>()
-                              .add(HomeCancelTransferEvent(transfer.id));
-                          break;
-                      }
-                    },
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              LinearProgressIndicator(
-                value: transfer.progress.percentage / 100,
-                backgroundColor: theme.colorScheme.muted,
-                valueColor: AlwaysStoppedAnimation<Color>(
-                  transfer.status == TransferStatus.failed
-                      ? Colors.red
-                      : theme.colorScheme.primary,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    '${transfer.progress.percentage.toStringAsFixed(1)}%',
-                    style: theme.textTheme.bodySmall,
-                  ),
-                  Text(
-                    transfer.progress.formattedSpeed,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.mutedForeground,
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
-    ).animate().fadeIn().slideY(begin: 0.1);
-  }
-
-  Widget _buildEmptyState(BuildContext context, HomeState state) {
-    final theme = ShadTheme.of(context);
-
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          children: [
-            Container(
-              width: 80,
-              height: 80,
-              decoration: BoxDecoration(
-                color: theme.colorScheme.muted,
-                borderRadius: BorderRadius.circular(40),
-              ),
-              child: Icon(
-                Icons.share,
-                size: 40,
-                color: theme.colorScheme.mutedForeground,
-              ),
-            ),
-            const SizedBox(height: 24),
-            Text(
-              'Ready to Share',
-              style: theme.textTheme.headlineSmall?.copyWith(
-                fontWeight: FontWeight.semibold,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Discover nearby devices or start advertising to begin sharing files',
-              textAlign: TextAlign.center,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.mutedForeground,
-              ),
-            ),
-            const SizedBox(height: 24),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                ShadButton.outline(
-                  onPressed: () {
-                    context
-                        .read<HomeBloc>()
-                        .add(const HomeStartDiscoveryEvent());
-                  },
-                  child: const Text('Find Devices'),
-                ),
-                ShadButton(
-                  onPressed: () {
-                    context
-                        .read<HomeBloc>()
-                        .add(const HomeStartAdvertisingEvent());
-                  },
-                  child: const Text('Be Discoverable'),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    ).animate().fadeIn(delay: 200.ms).scale(begin: const Offset(0.8, 0.8));
-  }
-
-  Widget? _buildFloatingActionButton(BuildContext context, HomeState state) {
-    if (!state.hasAllPermissions || !state.canPerformActions) {
-      return null;
+  void _handleQuickAction(String actionType) {
+    switch (actionType) {
+      case 'send':
+        // Navigate to file picker
+        break;
+      case 'receive':
+        // Navigate to receive screen
+        break;
+      case 'scan':
+        // Navigate to QR scanner
+        break;
+      case 'devices':
+        // Navigate to nearby devices
+        break;
+      default:
+        context.showErrorSnackBar('Action not implemented yet');
     }
-
-    return FloatingActionButton.extended(
-      onPressed: () {
-        if (state.connectedDevice != null) {
-          // Navigate to file picker to send files
-        } else if (state.isDiscovering || state.isAdvertising) {
-          // Stop current operation
-          if (state.isDiscovering) {
-            context.read<HomeBloc>().add(const HomeStopDiscoveryEvent());
-          } else {
-            context.read<HomeBloc>().add(const HomeStopAdvertisingEvent());
-          }
-        } else {
-          // Start discovery
-          context.read<HomeBloc>().add(const HomeStartDiscoveryEvent());
-        }
-      },
-      icon: Icon(
-        state.connectedDevice != null
-            ? Icons.send
-            : (state.isDiscovering || state.isAdvertising)
-                ? Icons.stop
-                : Icons.radar,
-      ),
-      label: Text(state.primaryActionText),
-    ).animate().fadeIn().scale();
   }
 }

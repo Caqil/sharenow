@@ -402,6 +402,10 @@ class AppConstants {
   /// Large desktop breakpoint
   static const double largeDesktopBreakpoint = 1440.0;
 
+  static double defaultPadding = 5;
+
+  static double sectionSpacing = 5;
+
   // ═══════════════════════════════════════════════════════════════════════════════════
   // UTILITY METHODS
   // ═══════════════════════════════════════════════════════════════════════════════════
