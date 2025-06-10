@@ -1,9 +1,7 @@
 import 'dart:async';
-import 'dart:io';
-import 'dart:nativewrappers/_internal/vm/lib/math_patch.dart' as math;
+import 'dart:math' as math;
 import 'dart:typed_data';
 import 'dart:convert';
-import 'dart:math';
 
 import 'package:flutter_shareit/core/services/storage_service.dart'
     show StorageService;

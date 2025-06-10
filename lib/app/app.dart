@@ -9,7 +9,9 @@ import '../core/constants/app_constants.dart';
 import '../core/di/direct_setup.dart';
 
 // Bloc imports
+import '../features/home/bloc/home_event.dart';
 import '../features/settings/bloc/settings_bloc.dart';
+import '../features/settings/bloc/settings_event.dart';
 import '../features/settings/bloc/settings_state.dart';
 import '../features/transfer/bloc/transfer_bloc.dart';
 import '../features/connection/bloc/connection_bloc.dart';
@@ -26,25 +28,25 @@ class ShareItApp extends StatelessWidget {
         // Settings Bloc - handles app-wide settings including theme
         BlocProvider<SettingsBloc>(
           create: (context) => SettingsBloc(AppServices.storageService)
-            ..add(const SettingsEvent.initialize()),
+            ..add(const SettingsInitializeEvent()),
         ),
 
-        // Transfer Bloc - handles file transfer operations
-        BlocProvider<TransferBloc>(
-          create: (context) => TransferBloc(
-            AppServices.transferService,
-            AppServices.connectionService,
-            AppServices.storageService,
-          ),
-        ),
+        // // Transfer Bloc - handles file transfer operations
+        // BlocProvider<TransferBloc>(
+        //   create: (context) => TransferBloc(
+        //     AppServices.transferService,
+        //     AppServices.connectionService,
+        //     AppServices.storageService,
+        //   ),
+        // ),
 
-        // Connection Bloc - handles device discovery and connections
-        BlocProvider<ConnectionBloc>(
-          create: (context) => ConnectionBloc(
-            AppServices.connectionService,
-            AppServices.storageService,
-          )..add(const ConnectionEvent.initialize()),
-        ),
+        // // Connection Bloc - handles device discovery and connections
+        // BlocProvider<ConnectionBloc>(
+        //   create: (context) => ConnectionBloc(
+        //     AppServices.connectionService,
+        //     AppServices.storageService,
+        //   )..add(const ConnectionEvent.initialize()),
+        // ),
 
         // Home Bloc - handles home screen state
         BlocProvider<HomeBloc>(
@@ -54,7 +56,7 @@ class ShareItApp extends StatelessWidget {
             AppServices.fileService,
             AppServices.storageService,
             AppServices.permissionService,
-          )..add(const HomeEvent.loadData()),
+          )..add(const HomeInitializeEvent()),
         ),
       ],
       child: BlocBuilder<SettingsBloc, SettingsState>(

@@ -10,11 +10,9 @@ import 'package:network_info_plus/network_info_plus.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter_bluetooth_serial/flutter_bluetooth_serial.dart';
-import 'package:permission_handler/permission_handler.dart';
 
 import '../models/device_model.dart';
 import '../models/transfer_model.dart';
-import '../constants/connection_types.dart';
 import 'permission_service.dart';
 
 /// Service for managing network connections and device discovery

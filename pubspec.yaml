@@ -91,7 +91,6 @@ dev_dependencies:
   # Code Generation
   build_runner: ^2.4.7
   freezed: ^2.4.7 # Updated version
-  json_serializable: ^6.7.1 # Also in dev_dependencies for build process
   injectable_generator: ^2.6.2
   hive_generator: ^2.0.1
 
@@ -107,9 +106,9 @@ flutter:
     - assets/images/
     - assets/icons/
     - assets/animations/
-  fonts:
-    - family: Roboto
-      fonts:
-        - asset: assets/fonts/Roboto-Regular.ttf
-        - asset: assets/fonts/Roboto-Bold.ttf
-          weight: 700
+  # fonts:
+  #   - family: Roboto
+  #     fonts:
+  #       - asset: assets/fonts/Roboto-Regular.ttf
+  #       - asset: assets/fonts/Roboto-Bold.ttf
+  #         weight: 700

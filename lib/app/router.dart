@@ -54,10 +54,10 @@ class AppRouter {
   AppRouter() {
     _router = GoRouter(
       initialLocation: initialRoute,
-      errorBuilder: (context, state) => ErrorPage(
-        error: state.error?.toString() ?? 'Unknown error occurred',
-        onRetry: () => context.go(home),
-      ),
+      // errorBuilder: (context, state) => ErrorPage(
+      //   error: state.error?.toString() ?? 'Unknown error occurred',
+      //   onRetry: () => context.go(home),
+      // ),
       routes: [
         // Splash Screen
         GoRoute(
@@ -74,56 +74,56 @@ class AppRouter {
         ),
 
         // Transfer Routes
-        GoRoute(
-          path: send,
-          name: 'send',
-          builder: (context, state) => const SendPage(),
-        ),
+        // GoRoute(
+        //   path: send,
+        //   name: 'send',
+        //   builder: (context, state) => const SendPage(),
+        // ),
 
-        GoRoute(
-          path: receive,
-          name: 'receive',
-          builder: (context, state) => const ReceivePage(),
-        ),
+        // GoRoute(
+        //   path: receive,
+        //   name: 'receive',
+        //   builder: (context, state) => const ReceivePage(),
+        // ),
 
-        GoRoute(
-          path: transferProgress,
-          name: 'transfer-progress',
-          builder: (context, state) {
-            final transferId = state.uri.queryParameters['transferId'];
-            return TransferProgressPage(transferId: transferId);
-          },
-        ),
+        // GoRoute(
+        //   path: transferProgress,
+        //   name: 'transfer-progress',
+        //   builder: (context, state) {
+        //     final transferId = state.uri.queryParameters['transferId'];
+        //     return TransferProgressPage(transferId: transferId);
+        //   },
+        // ),
 
-        // File Management
-        GoRoute(
-          path: fileBrowser,
-          name: 'files',
-          builder: (context, state) {
-            final initialPath = state.uri.queryParameters['path'];
-            return FileBrowserPage(initialPath: initialPath);
-          },
-        ),
+        // // File Management
+        // GoRoute(
+        //   path: fileBrowser,
+        //   name: 'files',
+        //   builder: (context, state) {
+        //     final initialPath = state.uri.queryParameters['path'];
+        //     return FileBrowserPage(initialPath: initialPath);
+        //   },
+        // ),
 
-        // Connection Management
-        GoRoute(
-          path: connection,
-          name: 'connection',
-          builder: (context, state) => const ConnectionPage(),
-        ),
+        // // Connection Management
+        // GoRoute(
+        //   path: connection,
+        //   name: 'connection',
+        //   builder: (context, state) => const ConnectionPage(),
+        // ),
 
-        GoRoute(
-          path: qrScanner,
-          name: 'qr-scanner',
-          builder: (context, state) => const QRScannerPage(),
-        ),
+        // GoRoute(
+        //   path: qrScanner,
+        //   name: 'qr-scanner',
+        //   builder: (context, state) => const QRScannerPage(),
+        // ),
 
-        // History
-        GoRoute(
-          path: history,
-          name: 'history',
-          builder: (context, state) => const HistoryPage(),
-        ),
+        // // History
+        // GoRoute(
+        //   path: history,
+        //   name: 'history',
+        //   builder: (context, state) => const HistoryPage(),
+        // ),
 
         // Settings
         GoRoute(
@@ -132,11 +132,11 @@ class AppRouter {
           builder: (context, state) => const SettingsPage(),
           routes: [
             // Nested route for About page
-            GoRoute(
-              path: 'about',
-              name: 'about',
-              builder: (context, state) => const AboutPage(),
-            ),
+            // GoRoute(
+            //   path: 'about',
+            //   name: 'about',
+            //   builder: (context, state) => const AboutPage(),
+            // ),
           ],
         ),
       ],
