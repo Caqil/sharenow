@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:get_it/get_it.dart';
+import 'package:go_router/go_router.dart'; // Add this import
+// REMOVED: import 'package:get_it/get_it.dart';
 
 import '../../../core/constants/app_constants.dart';
 import '../../../core/utils/extensions.dart';
 import '../../../core/services/storage_service.dart';
+import '../../../core/di/direct_setup.dart'; // Add this import
+import '../../../app/router.dart'; // Add this import
 import '../../../shared/widgets/app_button.dart';
 import '../widgets/stats_card.dart';
 import '../widgets/quick_actions.dart';
@@ -51,7 +54,8 @@ class _HomePageState extends State<HomePage>
   }
 
   void _initializeServices() {
-    _storageService = GetIt.instance<StorageService>();
+    // FIXED: Use AppServices instead of GetIt
+    _storageService = AppServices.storageService;
   }
 
   void _setupAnimations() {
@@ -82,168 +86,137 @@ class _HomePageState extends State<HomePage>
     try {
       // Load user data and statistics
       final futures = await Future.wait([
-        _storageService.getTransferStatisticsMap(),
-        _storageService.getRecentTransfers(limit: 5),
+        _getTransferStatistics(),
+        _getRecentTransfers(),
       ]);
 
       if (mounted) {
         setState(() {
           _userName = _storageService.getUserName() ?? 'User';
-          _transferStats = futures[0] as Map<String, dynamic>? ?? {};
-          _recentTransfers = futures[1] as List<dynamic>? ?? [];
+          _transferStats = futures[0] as Map<String, dynamic>;
+          _recentTransfers = futures[1] as List<dynamic>;
           _isLoading = false;
         });
+
+        // Start animations after data is loaded
         _animationController.forward();
       }
     } catch (e) {
       if (mounted) {
-        setState(() => _isLoading = false);
-        context.showErrorSnackBar('Failed to load data');
+        setState(() {
+          _isLoading = false;
+        });
+
+        // Show error to user
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to load data: $e'),
+            backgroundColor: Theme.of(context).colorScheme.error,
+          ),
+        );
       }
     }
   }
 
+  // Helper method to get transfer statistics
+  Future<Map<String, dynamic>> _getTransferStatistics() async {
+    try {
+      final stats = await _storageService.getTransferStatistics();
+      return {
+        'totalTransfers': stats.totalTransfers,
+        'successfulTransfers': stats.successfulTransfers,
+        'failedTransfers': stats.failedTransfers,
+        'totalBytesTransferred': stats.totalBytesTransferred,
+        'averageTransferSize': stats.averageTransferSize,
+        'successRate': stats.successRate,
+      };
+    } catch (e) {
+      return {
+        'totalTransfers': 0,
+        'successfulTransfers': 0,
+        'failedTransfers': 0,
+        'totalBytesTransferred': 0,
+        'averageTransferSize': 0.0,
+        'successRate': 0.0,
+      };
+    }
+  }
+
+  // Helper method to get recent transfers
+  Future<List<dynamic>> _getRecentTransfers() async {
+    try {
+      final transfers = await _storageService.getTransferHistory(limit: 5);
+      return transfers.map((transfer) => transfer.toJson()).toList();
+    } catch (e) {
+      return [];
+    }
+  }
+
   Future<void> _refreshData() async {
-    HapticFeedback.lightImpact();
+    setState(() {
+      _isLoading = true;
+    });
     await _loadData();
   }
 
   @override
   Widget build(BuildContext context) {
-    super.build(context);
+    super.build(context); // Required for AutomaticKeepAliveClientMixin
 
-    if (_isLoading) {
-      return _buildLoadingState();
-    }
+    return Scaffold(
+      backgroundColor: context.colorScheme.background,
+      body: SafeArea(
+        child: _isLoading ? _buildLoadingView() : _buildMainContent(),
+      ),
+    );
+  }
 
+  Widget _buildLoadingView() {
+    return const Center(
+      child: CircularProgressIndicator(),
+    );
+  }
+
+  Widget _buildMainContent() {
     return RefreshIndicator(
       onRefresh: _refreshData,
-      child: CustomScrollView(
+      child: SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
-        slivers: [
-          _buildAppBar(),
-          SliverToBoxAdapter(
-            child: FadeTransition(
-              opacity: _fadeAnimation,
-              child: SlideTransition(
-                position: _slideAnimation,
-                child: Padding(
-                  padding: const EdgeInsets.all(AppConstants.defaultPadding),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _buildWelcomeSection(),
-                      const SizedBox(height: AppConstants.defaultPadding),
-                      _buildStatsSection(),
-                      const SizedBox(height: AppConstants.defaultPadding),
-                      _buildQuickActions(),
-                      const SizedBox(height: AppConstants.defaultPadding),
-                      _buildRecentTransfers(),
-                      SizedBox(height: context.mediaQuery.padding.bottom),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildLoadingState() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          CircularProgressIndicator(
-            color: context.colorScheme.primary,
-          ),
-          const SizedBox(height: 16),
-          Text(
-            'Loading your dashboard...',
-            style: context.textTheme.bodyMedium?.copyWith(
-              color: context.colorScheme.onSurfaceVariant,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildAppBar() {
-    return SliverAppBar(
-      expandedHeight: 120,
-      floating: false,
-      pinned: true,
-      backgroundColor: context.colorScheme.surface,
-      surfaceTintColor: Colors.transparent,
-      elevation: 0,
-      flexibleSpace: FlexibleSpaceBar(
-        titlePadding: const EdgeInsets.only(
-          left: AppConstants.defaultPadding,
-          bottom: 16,
-        ),
-        title: Text(
-          'ShareNow',
-          style: context.textTheme.headlineSmall?.copyWith(
-            color: context.colorScheme.onSurface,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        background: Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                context.colorScheme.primaryContainer.withOpacity(0.1),
-                context.colorScheme.surface,
+        padding: const EdgeInsets.all(AppConstants.defaultPadding),
+        child: FadeTransition(
+          opacity: _fadeAnimation,
+          child: SlideTransition(
+            position: _slideAnimation,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildWelcomeSection(),
+                const SizedBox(height: AppConstants.defaultPadding),
+                _buildStatsSection(),
+                const SizedBox(height: AppConstants.defaultPadding),
+                _buildQuickActionsSection(),
+                const SizedBox(height: AppConstants.defaultPadding),
+                _buildRecentTransfersSection(),
               ],
             ),
           ),
         ),
       ),
-      actions: [
-        IconButton(
-          onPressed: () {
-            // Navigate to settings
-            HapticFeedback.lightImpact();
-          },
-          icon: Icon(
-            Icons.settings_outlined,
-            color: context.colorScheme.onSurface,
-          ),
-          tooltip: 'Settings',
-        ),
-        const SizedBox(width: 8),
-      ],
     );
   }
 
   Widget _buildWelcomeSection() {
-    final hour = DateTime.now().hour;
-    String greeting;
-
-    if (hour < 12) {
-      greeting = 'Good morning';
-    } else if (hour < 17) {
-      greeting = 'Good afternoon';
-    } else {
-      greeting = 'Good evening';
-    }
-
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(AppConstants.defaultPadding),
       decoration: BoxDecoration(
         gradient: LinearGradient(
+          colors: [
+            context.colorScheme.primary,
+            context.colorScheme.primaryContainer,
+          ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [
-            context.colorScheme.primaryContainer,
-            context.colorScheme.primaryContainer.withOpacity(0.7),
-          ],
         ),
         borderRadius: BorderRadius.circular(AppConstants.defaultBorderRadius),
       ),
@@ -251,17 +224,17 @@ class _HomePageState extends State<HomePage>
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            '$greeting, $_userName! 👋',
+            'Welcome back, $_userName!',
             style: context.textTheme.headlineSmall?.copyWith(
-              color: context.colorScheme.onPrimaryContainer,
+              color: context.colorScheme.onPrimary,
               fontWeight: FontWeight.bold,
             ),
           ),
           const SizedBox(height: 8),
           Text(
-            'Ready to share files with nearby devices?',
-            style: context.textTheme.bodyMedium?.copyWith(
-              color: context.colorScheme.onPrimaryContainer.withOpacity(0.8),
+            'Ready to share files quickly and securely?',
+            style: context.textTheme.bodyLarge?.copyWith(
+              color: context.colorScheme.onPrimary.withOpacity(0.9),
             ),
           ),
         ],
@@ -270,137 +243,69 @@ class _HomePageState extends State<HomePage>
   }
 
   Widget _buildStatsSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Icon(
-              Icons.analytics_outlined,
-              color: context.colorScheme.primary,
-              size: 20,
-            ),
-            const SizedBox(width: 8),
-            Text(
-              'Your Statistics',
-              style: context.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w600,
-                color: context.colorScheme.onSurface,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 16),
-        StatsCard(
-          transferStats: _transferStats,
-          onStatsUpdated: _refreshData,
-        ),
-      ],
+    return const StatsCard(
+      transferStats: {},
     );
   }
 
-  Widget _buildQuickActions() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Icon(
-              Icons.bolt_outlined,
-              color: context.colorScheme.primary,
-              size: 20,
-            ),
-            const SizedBox(width: 8),
-            Text(
-              'Quick Actions',
-              style: context.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w600,
-                color: context.colorScheme.onSurface,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 16),
-        QuickActions(
-          onActionTapped: (actionType) {
-            HapticFeedback.lightImpact();
-            // Handle action navigation
-            _handleQuickAction(actionType);
-          },
-        ),
-      ],
+  Widget _buildQuickActionsSection() {
+    return QuickActions(
+      onActionTapped: (actionType) {
+        _handleQuickAction(actionType);
+      },
     );
   }
 
-  Widget _buildRecentTransfers() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Row(
-              children: [
-                Icon(
-                  Icons.history,
-                  color: context.colorScheme.primary,
-                  size: 20,
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  'Recent Transfers',
-                  style: context.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
-                    color: context.colorScheme.onSurface,
-                  ),
-                ),
-              ],
-            ),
-            if (_recentTransfers.isNotEmpty)
-              TextButton(
-                onPressed: () {
-                  HapticFeedback.lightImpact();
-                  // Navigate to full history
-                },
-                child: Text(
-                  'View All',
-                  style: TextStyle(
-                    color: context.colorScheme.primary,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ),
-          ],
-        ),
-        const SizedBox(height: 16),
-        RecentTransfers(
-          transfers: _recentTransfers,
-          onTransferTapped: (transfer) {
-            HapticFeedback.lightImpact();
-            // Navigate to transfer details
-          },
-          onRefresh: _refreshData,
-        ),
-      ],
+  Widget _buildRecentTransfersSection() {
+    return RecentTransfers(
+      transfers: _recentTransfers,
+      onTransferTapped: (transferId) {
+        _handleTransferTapped(transferId);
+      },
     );
   }
 
   void _handleQuickAction(String actionType) {
     switch (actionType) {
       case 'send':
-        // Navigate to file picker
+        _navigateToSend();
         break;
       case 'receive':
-        // Navigate to receive screen
+        _navigateToReceive();
         break;
-      case 'scan':
-        // Navigate to QR scanner
+      case 'browse':
+        _navigateToFileBrowser();
         break;
-      case 'devices':
-        // Navigate to nearby devices
+      case 'connect':
+        _navigateToConnection();
         break;
       default:
-        context.showErrorSnackBar('Action not implemented yet');
+        break;
     }
+  }
+
+  void _handleTransferTapped(String transferId) {
+    // Navigate to transfer details or progress using GoRouter
+    AppRouter.goToTransferProgress(context, transferId);
+  }
+
+  void _navigateToSend() {
+    AppRouter.goToSend(context);
+  }
+
+  void _navigateToReceive() {
+    AppRouter.goToReceive(context);
+  }
+
+  void _navigateToFileBrowser() {
+    AppRouter.goToFileBrowser(context);
+  }
+
+  void _navigateToConnection() {
+    AppRouter.goToConnection(context);
+  }
+
+  void _navigateToHistory() {
+    AppRouter.goToHistory(context);
   }
 }

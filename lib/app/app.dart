@@ -9,9 +9,7 @@ import '../core/constants/app_constants.dart';
 import '../core/di/direct_setup.dart';
 
 // Bloc imports
-import '../features/home/bloc/home_event.dart';
 import '../features/settings/bloc/settings_bloc.dart';
-import '../features/settings/bloc/settings_event.dart';
 import '../features/settings/bloc/settings_state.dart';
 import '../features/transfer/bloc/transfer_bloc.dart';
 import '../features/connection/bloc/connection_bloc.dart';
@@ -27,11 +25,10 @@ class ShareItApp extends StatelessWidget {
       providers: [
         // Settings Bloc - handles app-wide settings including theme
         BlocProvider<SettingsBloc>(
-          create: (context) => SettingsBloc(AppServices.storageService)
-            ..add(const SettingsInitializeEvent()),
+          create: (context) => SettingsBloc(AppServices.storageService),
         ),
 
-        // // Transfer Bloc - handles file transfer operations
+        // Transfer Bloc - handles file transfer operations
         // BlocProvider<TransferBloc>(
         //   create: (context) => TransferBloc(
         //     AppServices.transferService,
@@ -45,7 +42,7 @@ class ShareItApp extends StatelessWidget {
         //   create: (context) => ConnectionBloc(
         //     AppServices.connectionService,
         //     AppServices.storageService,
-        //   )..add(const ConnectionEvent.initialize()),
+        //   ),
         // ),
 
         // Home Bloc - handles home screen state
@@ -56,7 +53,7 @@ class ShareItApp extends StatelessWidget {
             AppServices.fileService,
             AppServices.storageService,
             AppServices.permissionService,
-          )..add(const HomeInitializeEvent()),
+          ),
         ),
       ],
       child: BlocBuilder<SettingsBloc, SettingsState>(
@@ -74,35 +71,20 @@ class ShareItApp extends StatelessWidget {
             // Routing Configuration
             routerConfig: AppServices.router.router,
 
+            // Theme Configuration
+            theme: AppTheme.lightTheme(
+              primaryColor: settingsState.primaryColor ?? AppTheme.blue,
+            ),
             darkTheme: AppTheme.darkTheme(
               primaryColor: settingsState.primaryColor ?? AppTheme.blue,
             ),
             themeMode: settingsState.themeMode,
-            supportedLocales: const [
-              Locale('en', 'US'),
-              Locale('es', 'ES'),
-              Locale('fr', 'FR'),
-              Locale('de', 'DE'),
-              Locale('zh', 'CN'),
-              Locale('ja', 'JP'),
-            ],
 
-            // Builder for system UI configuration and responsive design
+            // System UI Configuration
             builder: (context, child) {
-              return MediaQuery(
-                // Ensure text scaling doesn't break UI
-                data: MediaQuery.of(context).copyWith(
-                  textScaler: TextScaler.linear(
-                    MediaQuery.of(context)
-                        .textScaler
-                        .scale(1.0)
-                        .clamp(0.8, 1.3),
-                  ),
-                ),
-                child: AnnotatedRegion<SystemUiOverlayStyle>(
-                  value: _getSystemUiOverlayStyle(context),
-                  child: child ?? const SizedBox.shrink(),
-                ),
+              return AnnotatedRegion<SystemUiOverlayStyle>(
+                value: _getSystemUiOverlayStyle(context),
+                child: child ?? const SizedBox.shrink(),
               );
             },
           );
@@ -111,9 +93,10 @@ class ShareItApp extends StatelessWidget {
     );
   }
 
-  /// Get system UI overlay style based on current theme
+  /// Get appropriate system UI overlay style based on current theme
   SystemUiOverlayStyle _getSystemUiOverlayStyle(BuildContext context) {
-    final isDark = context.isDarkMode;
+    final theme = ShadTheme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
 
     return SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
@@ -164,90 +147,5 @@ class AppConfig {
       // Log error but don't prevent app from starting
       debugPrint('Failed to configure system settings: $e');
     }
-  }
-}
-
-/// Error boundary widget for handling app-level errors
-class AppErrorBoundary extends StatefulWidget {
-  final Widget child;
-
-  const AppErrorBoundary({
-    super.key,
-    required this.child,
-  });
-
-  @override
-  State<AppErrorBoundary> createState() => _AppErrorBoundaryState();
-}
-
-class _AppErrorBoundaryState extends State<AppErrorBoundary> {
-  bool hasError = false;
-  Object? error;
-  StackTrace? stackTrace;
-
-  @override
-  Widget build(BuildContext context) {
-    if (hasError) {
-      return MaterialApp(
-        home: Scaffold(
-          appBar: AppBar(title: const Text('Application Error')),
-          body: Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(Icons.error_outline, size: 64, color: Colors.red),
-                const SizedBox(height: 16),
-                const Text(
-                  'Something went wrong',
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  error?.toString() ?? 'Unknown error',
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(color: Colors.grey),
-                ),
-                const SizedBox(height: 24),
-                ElevatedButton(
-                  onPressed: () {
-                    setState(() {
-                      hasError = false;
-                      error = null;
-                      stackTrace = null;
-                    });
-                  },
-                  child: const Text('Retry'),
-                ),
-              ],
-            ),
-          ),
-        ),
-      );
-    }
-
-    return widget.child;
-  }
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-
-    // Reset error state when dependencies change
-    if (hasError) {
-      setState(() {
-        hasError = false;
-        error = null;
-        stackTrace = null;
-      });
-    }
-  }
-
-  /// Handle errors in the widget tree
-  void handleError(Object error, StackTrace stackTrace) {
-    setState(() {
-      hasError = true;
-      this.error = error;
-      this.stackTrace = stackTrace;
-    });
   }
 }

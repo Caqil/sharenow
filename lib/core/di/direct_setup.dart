@@ -44,7 +44,9 @@ class AppServices {
     router = AppRouter();
 
     // Initialize services
-    await storageService.initialize();
+    await fileService.initialize();
+    await transferService.initialize();
+    //await notificationService.initialize();
     await permissionService.initialize();
     //await notificationService.initialize();
     await connectionService.initialize();

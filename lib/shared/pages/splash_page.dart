@@ -1,11 +1,13 @@
-// lib/features/splash/pages/splash_page.dart
+// lib/shared/pages/splash_page.dart
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:lottie/lottie.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:go_router/go_router.dart'; // Add this import
 
-import '../../../core/constants/app_constants.dart';
-import '../../../core/utils/extensions.dart';
+import '../../core/constants/app_constants.dart';
+import '../../core/utils/extensions.dart';
+import '../../app/router.dart'; // Add this import
 
 class SplashPage extends StatefulWidget {
   const SplashPage({super.key});
@@ -127,8 +129,14 @@ class _SplashPageState extends State<SplashPage> with TickerProviderStateMixin {
       // Restore system UI
       SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
 
-      // Navigate to the main app
-      Navigator.of(context).pushReplacementNamed('/home');
+      // Navigate to the main app using GoRouter
+      // FIXED: Use GoRouter navigation instead of Navigator.pushReplacementNamed
+      context.go(AppRouter.home);
+
+      // Alternative approaches:
+      // AppRouter.goToHome(context); // Using the helper method
+      // context.go('/home'); // Direct path
+      // context.pushReplacement('/home'); // If you want push replacement behavior
     }
   }
 
@@ -223,18 +231,16 @@ class _SplashPageState extends State<SplashPage> with TickerProviderStateMixin {
                 fontSize: 32,
                 fontWeight: FontWeight.bold,
                 color: context.colorScheme.onPrimary,
-                letterSpacing: 1.2,
               ),
             ),
-            SizedBox(height: AppConstants.defaultPadding),
+            const SizedBox(height: 8),
             Text(
-              AppConstants.appDescription,
+              'Fast & Secure File Sharing',
               style: GoogleFonts.roboto(
                 fontSize: 16,
-                color: context.colorScheme.onPrimary.withOpacity(0.9),
-                letterSpacing: 0.5,
+                fontWeight: FontWeight.w400,
+                color: context.colorScheme.onPrimary.withOpacity(0.8),
               ),
-              textAlign: TextAlign.center,
             ),
           ],
         ),
@@ -243,56 +249,32 @@ class _SplashPageState extends State<SplashPage> with TickerProviderStateMixin {
   }
 
   Widget _buildLoadingSection() {
-    return Column(
-      children: [
-        Container(
-          width: 200,
-          height: 4,
-          decoration: BoxDecoration(
-            color: context.colorScheme.onPrimary.withOpacity(0.2),
-            borderRadius: BorderRadius.circular(2),
-          ),
-          child: AnimatedBuilder(
-            animation: _progressAnimation,
-            builder: (context, child) {
-              return Align(
-                alignment: Alignment.centerLeft,
-                child: Container(
-                  width: 200 * _progressAnimation.value,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: context.colorScheme.onPrimary,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
+    return AnimatedBuilder(
+      animation: _progressAnimation,
+      builder: (context, child) {
+        return Column(
+          children: [
+            SizedBox(
+              width: 200,
+              child: LinearProgressIndicator(
+                value: _progressAnimation.value,
+                backgroundColor: context.colorScheme.onPrimary.withOpacity(0.3),
+                valueColor: AlwaysStoppedAnimation<Color>(
+                  context.colorScheme.onPrimary,
                 ),
-              );
-            },
-          ),
-        ),
-        SizedBox(height: AppConstants.defaultPadding),
-        AnimatedBuilder(
-          animation: _progressAnimation,
-          builder: (context, child) {
-            final messages = [
-              'Initializing...',
-              'Setting up connections...',
-              'Preparing interface...',
-              'Almost ready...',
-            ];
-            final index = (_progressAnimation.value * messages.length)
-                .floor()
-                .clamp(0, messages.length - 1);
-
-            return Text(
-              messages[index],
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Loading...',
               style: GoogleFonts.roboto(
                 fontSize: 14,
-                color: context.colorScheme.onPrimary.withOpacity(0.8),
+                color: context.colorScheme.onPrimary.withOpacity(0.7),
               ),
-            );
-          },
-        ),
-      ],
+            ),
+          ],
+        );
+      },
     );
   }
 }

@@ -49,7 +49,7 @@ class AppTheme {
     return ShadThemeData(
       brightness: Brightness.light,
       colorScheme: ShadColorScheme.fromName(
-        'light',
+        'zinc', // Use a valid shadcn color scheme name
         brightness: Brightness.light,
       ).copyWith(
         primary: primary,
@@ -71,7 +71,7 @@ class AppTheme {
     return ShadThemeData(
       brightness: Brightness.dark,
       colorScheme: ShadColorScheme.fromName(
-        'dark',
+        'zinc', // Use a valid shadcn color scheme name
         brightness: Brightness.dark,
       ).copyWith(
         primary: primary,

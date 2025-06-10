@@ -45,8 +45,8 @@ class StorageService {
   static const String _keyCrashReportingEnabled = 'crash_reporting_enabled';
 
   // Hive boxes
-  late Box<TransferModel> _transferHistoryBox_;
-  late Box<DeviceModel> _devicesBox_;
+  late Box<dynamic> _transferHistoryBox_;
+  late Box<dynamic> _devicesBox_;
   late Box<dynamic> _settingsBox_;
   late Box<dynamic> _cacheBox_;
 
@@ -73,25 +73,21 @@ class StorageService {
   bool get isInitialized => _isInitialized;
 
   /// Initialize the storage service
-  Future<void> initialize() async {
-    if (_isInitialized) return;
-
+  Future<void> _initializeHive() async {
     try {
       // Initialize Hive
-      await _initializeHive();
+      final appDir = await getApplicationDocumentsDirectory();
+      await Hive.initFlutter(appDir.path);
 
-      // Initialize SharedPreferences
-      _prefs = await SharedPreferences.getInstance();
+      // For now, using dynamic boxes (no adapter registration needed)
 
-      // Perform first-time setup if needed
-      await _performFirstTimeSetup();
-
-      // Clean up old data
-      await _cleanupOldData();
-
-      _isInitialized = true;
+      // Open boxes as dynamic
+      _transferHistoryBox_ = await Hive.openBox<dynamic>(_transferHistoryBox);
+      _devicesBox_ = await Hive.openBox<dynamic>(_devicesBox);
+      _settingsBox_ = await Hive.openBox<dynamic>(_settingsBox);
+      _cacheBox_ = await Hive.openBox<dynamic>(_cacheBox);
     } catch (e) {
-      throw StorageServiceException('Failed to initialize storage service: $e');
+      throw StorageServiceException('Failed to initialize Hive: $e');
     }
   }
 
@@ -104,7 +100,8 @@ class StorageService {
     _ensureInitialized();
 
     try {
-      await _transferHistoryBox_.put(transfer.id, transfer);
+      await _transferHistoryBox_.put(
+          transfer.id, transfer.toJson()); // Store as JSON
       _emitTransferHistoryUpdate();
     } catch (e) {
       throw StorageServiceException('Failed to save transfer: $e');
@@ -116,14 +113,18 @@ class StorageService {
     int? limit,
     TransferStatus? status,
     TransferDirection? direction,
-    DateTime? since,
+    DateTime? fromDate,
+    DateTime? toDate,
   }) async {
     _ensureInitialized();
 
     try {
-      List<TransferModel> transfers = _transferHistoryBox_.values.toList();
+      var transfers = _transferHistoryBox_.values
+          .map(
+              (json) => TransferModel.fromJson(Map<String, dynamic>.from(json)))
+          .toList();
 
-      // Apply filters
+      // Apply filters...
       if (status != null) {
         transfers = transfers.where((t) => t.status == status).toList();
       }
@@ -132,15 +133,21 @@ class StorageService {
         transfers = transfers.where((t) => t.direction == direction).toList();
       }
 
-      if (since != null) {
-        transfers = transfers.where((t) => t.createdAt.isAfter(since)).toList();
+      if (fromDate != null) {
+        transfers =
+            transfers.where((t) => t.createdAt.isAfter(fromDate)).toList();
+      }
+
+      if (toDate != null) {
+        transfers =
+            transfers.where((t) => t.createdAt.isBefore(toDate)).toList();
       }
 
       // Sort by creation date (newest first)
       transfers.sort((a, b) => b.createdAt.compareTo(a.createdAt));
 
       // Apply limit
-      if (limit != null && transfers.length > limit) {
+      if (limit != null && limit > 0) {
         transfers = transfers.take(limit).toList();
       }
 
@@ -306,7 +313,7 @@ class StorageService {
     _ensureInitialized();
 
     try {
-      await _devicesBox_.put(device.id, device);
+      await _devicesBox_.put(device.id, device.toJson()); // Store as JSON
       _emitDevicesUpdate();
     } catch (e) {
       throw StorageServiceException('Failed to save device: $e');
@@ -316,24 +323,27 @@ class StorageService {
   /// Get all saved devices
   Future<List<DeviceModel>> getSavedDevices({
     bool? trustedOnly,
-    DeviceType? type,
+    DeviceType? deviceType,
   }) async {
     _ensureInitialized();
 
     try {
-      List<DeviceModel> devices = _devicesBox_.values.toList();
+      var devices = _devicesBox_.values
+          .map((json) => DeviceModel.fromJson(Map<String, dynamic>.from(json)))
+          .toList();
 
       // Apply filters
       if (trustedOnly == true) {
         devices = devices.where((d) => d.isTrusted).toList();
       }
 
-      if (type != null) {
-        devices = devices.where((d) => d.type == type).toList();
+      if (deviceType != null) {
+        devices = devices.where((d) => d.type == deviceType).toList();
       }
 
       // Sort by last seen (most recent first)
-      devices.sort((a, b) => b.lastSeen.compareTo(a.lastSeen));
+      devices.sort((a, b) =>
+          (b.lastSeen ?? DateTime(0)).compareTo(a.lastSeen ?? DateTime(0)));
 
       return devices;
     } catch (e) {
@@ -933,28 +943,6 @@ class StorageService {
   // ═══════════════════════════════════════════════════════════════════════════════════
   // PRIVATE METHODS
   // ═══════════════════════════════════════════════════════════════════════════════════
-
-  Future<void> _initializeHive() async {
-    try {
-      // Initialize Hive
-      final appDir = await getApplicationDocumentsDirectory();
-      await Hive.initFlutter(appDir.path);
-
-      // Register adapters (these need to be generated first)
-      // Hive.registerAdapter(TransferModelAdapter());
-      // Hive.registerAdapter(DeviceModelAdapter());
-      // For now, using dynamic boxes
-
-      // Open boxes
-      _transferHistoryBox_ =
-          await Hive.openBox<TransferModel>(_transferHistoryBox);
-      _devicesBox_ = await Hive.openBox<DeviceModel>(_devicesBox);
-      _settingsBox_ = await Hive.openBox<dynamic>(_settingsBox);
-      _cacheBox_ = await Hive.openBox<dynamic>(_cacheBox);
-    } catch (e) {
-      throw StorageServiceException('Failed to initialize Hive: $e');
-    }
-  }
 
   Future<void> _performFirstTimeSetup() async {
     if (getFirstLaunch()) {

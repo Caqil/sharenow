@@ -603,7 +603,7 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
     await _connectionService.initialize();
     await _transferService.initialize();
     await _fileService.initialize();
-    await _storageService.initialize();
+    // await _storageService.initialize();
     await _permissionService.initialize();
   }
 

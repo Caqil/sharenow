@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_shareit/app/theme.dart';
 
 import '../../../core/constants/app_constants.dart';
 import '../../../core/utils/extensions.dart';
@@ -99,7 +100,7 @@ class _QuickActionsState extends State<QuickActions>
         ],
       ),
       child: Padding(
-        padding:  EdgeInsets.all(AppConstants.defaultPadding),
+        padding: const EdgeInsets.all(AppConstants.defaultPadding),
         child: Column(
           children: [
             _buildHeader(),
@@ -253,12 +254,12 @@ class _QuickActionsState extends State<QuickActions>
 
   List<QuickAction> _getQuickActions() {
     return [
-      QuickAction(
+      const QuickAction(
         icon: Icons.send_outlined,
         label: 'Send Files',
         description: 'Share files to nearby devices',
         actionType: 'send',
-        color: context.colorScheme.primary,
+        color: Colors.amber,
       ),
       const QuickAction(
         icon: Icons.download_outlined,

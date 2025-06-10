@@ -39,7 +39,8 @@ class _StatsCardState extends State<StatsCard> with TickerProviderStateMixin {
 
   void _setupAnimations() {
     _animationController = AnimationController(
-      duration: Duration(milliseconds: AppConstants.mediumAnimationDuration),
+      duration:
+          const Duration(milliseconds: AppConstants.mediumAnimationDuration),
       vsync: this,
     );
 
@@ -80,7 +81,7 @@ class _StatsCardState extends State<StatsCard> with TickerProviderStateMixin {
         ],
       ),
       child: Padding(
-        padding:  EdgeInsets.all(AppConstants.defaultPadding),
+        padding: const EdgeInsets.all(AppConstants.defaultPadding),
         child: Column(
           children: [
             _buildHeader(),
@@ -254,7 +255,9 @@ class _StatsCardState extends State<StatsCard> with TickerProviderStateMixin {
       StatItem(
         icon: Icons.storage_outlined,
         label: 'Data Shared',
-        value: totalBytes.formatAsFileSize,
+        value: totalBytes > 0
+            ? '${(totalBytes / 1024 / 1024).toStringAsFixed(1)} MB'
+            : '0 MB',
         color: const Color(0xFF4CAF50),
       ),
       StatItem(
@@ -283,7 +286,7 @@ class _StatsCardState extends State<StatsCard> with TickerProviderStateMixin {
             top: Radius.circular(AppConstants.defaultBorderRadius),
           ),
         ),
-        padding:  EdgeInsets.all(AppConstants.defaultPadding),
+        padding: const EdgeInsets.all(AppConstants.defaultPadding),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
